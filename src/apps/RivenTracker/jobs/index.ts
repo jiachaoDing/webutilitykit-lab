@@ -1,5 +1,7 @@
 import { SamplingService } from "../services/SamplingService";
 import { SyncService } from "../services/SyncService";
+import { ExportService } from "../services/ExportService";
+import { CosClient } from "../infra/CosClient";
 import { WfmV1Client } from "../clients/WfmV1Client";
 import { WfmV2Client } from "../clients/WfmV2Client";
 import { TickRepo } from "../repos/TickRepo";
@@ -57,6 +59,35 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
 
   try {
     const stats = await samplingService.runShard(shard, windowTs);
+    
+    // 如果是最后一个分片 (shard 5)，执行导出并上传到 COS
+    if (shard === 5) {
+      ctx.waitUntil((async () => {
+        try {
+          console.log(`[Export] Starting export at window ${windowTs}`);
+          const exportService = new ExportService(db);
+          const data = await exportService.export30d();
+          
+          if (env.COS_SECRET_ID && env.COS_SECRET_KEY && env.COS_BUCKET && env.COS_REGION) {
+            const cos = new CosClient({
+              bucket: env.COS_BUCKET,
+              region: env.COS_REGION,
+              secretId: env.COS_SECRET_ID,
+              secretKey: env.COS_SECRET_KEY
+            });
+            
+            const key = env.COS_OBJECT_KEY_LATEST || 'riven/export-30d-latest.json';
+            await cos.putObject(key, JSON.stringify(data));
+            console.log(`[Export] Successfully uploaded to COS: ${key}`);
+          } else {
+            console.warn('[Export] COS configuration missing, skipping upload.');
+          }
+        } catch (err: any) {
+          console.error(`[Export] Failed: ${err.message}`);
+        }
+      })());
+    }
+
     await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(stats));
   } catch (e: any) {
     await jobRepo.update(jobId, 'fail', new Date().toISOString(), JSON.stringify({ error: e.message }));

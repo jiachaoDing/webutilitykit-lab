@@ -62,11 +62,11 @@ export class TickRepo {
         w.thumb,
         w.weapon_group as "group",
         t.active_count,
-        t.bottom_price
+        t.min_price
       FROM riven_bottom_tick t
       JOIN riven_weapon_dict w ON t.weapon_slug = w.slug
       WHERE t.ts = ? AND t.source_status = 'ok'
-      ORDER BY t.active_count DESC, t.bottom_price ASC
+      ORDER BY t.active_count DESC, t.min_price ASC
       LIMIT ?
     `).bind(lastTs, limit).all<{
       slug: string;
@@ -75,7 +75,7 @@ export class TickRepo {
       thumb: string;
       group: string;
       active_count: number;
-      bottom_price: number;
+      min_price: number;
     }>();
     
     return results;

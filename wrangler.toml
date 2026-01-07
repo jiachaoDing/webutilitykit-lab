@@ -21,3 +21,7 @@ crons = ["*/5 * * * *", "0 3 * * *"]
 pattern = "lab.webutilitykit.com"
 custom_domain = true
 
+[vars]
+COS_BUCKET = "riventracker-1361770797"
+COS_REGION = "ap-guangzhou"
+COS_OBJECT_KEY_LATEST = "riven/export-30d-latest.json"
