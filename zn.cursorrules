@@ -1,0 +1,78 @@
+你是本仓库（WebUtilityKit Lab / AI Incubator）的 AI 编码代理。请将以下内容视为全局上下文与硬性约束，优先级高于一般偏好。
+
+## 项目概览（请先读懂再动手）
+- **域名**：`lab.webutilitykit.com`
+- **基础设施**：Cloudflare Global Network（Edge Computing）
+- **运行时（主要）**：Cloudflare Workers + Workers Static Assets（`public/` 目录静态托管）
+- **定位**：一个“孵化器”承载多个小工具（多入口、多路由、共享基础设施），可逐步迁移回主站 `webutilitykit.com`
+
+## 推荐架构（必须遵循）
+- **默认推荐**：单 Worker 统一入口 + 静态资源托管 + API 路由分层
+- **请求流**：
+  - `GET /`、`/apps/**`、`/assets/**`：由 Static Assets 分发（静态资源）
+  - `/api/**`：命中 Worker 逻辑（路由/中间件/handlers）
+- Workers 入口遵循模块化形式：`export default { fetch(request, env, ctx) { ... } }`
+
+## 目录结构与放置规范（硬性）
+禁止随意在根目录散落文件；新增内容必须归类到以下目录之一：
+- `public/`：静态资源根（由 Workers Static Assets 分发）
+  - `public/index.html`：Lab 大厅（Dashboard：所有 App 入口）
+  - `public/assets/`：全局静态资源（Logo / Global CSS / Common Libs）
+  - `public/apps/<app-name>/`：每个 App 的前端（自包含）
+- `src/`：Worker 源码（统一入口、路由、中间件、handlers）
+  - `src/index.ts`：Worker 入口（fetch）
+  - `src/router/`：路由与分发（/api/**）
+  - `src/middleware/`：共享中间件（auth/cors/rate-limit/logging）
+  - `src/api/`：平台级公共 API（如 health/version/usage/ai-proxy）
+  - `src/apps/<app-name>/`：每个 App 的后端逻辑（handlers）
+
+## 路由约定（必须对齐）
+- **静态页面**
+  - `/` → `public/index.html`
+  - `/apps/<app-name>/...` → `public/apps/<app-name>/...`
+  - `/assets/...` → `public/assets/...`
+- **API**
+  - `/api/<app-name>/...` → `src/apps/<app-name>/...`
+  - `/api/_/health`、`/api/_/version` → `src/api/...`
+- 建议从第一天引入版本化（例如 `/api/v1/...`），避免未来破坏性变更（如本仓库已实现则遵循现状）。
+
+## AI Agent 开发准则（Crucial，必须执行）
+### 1) Edge-First（边缘优先）
+- 能在 Worker 内解决的逻辑不要依赖外部服务。
+- 通过 `env`（而不是硬编码）访问 D1/KV/R2/AI 等绑定。
+- Worker 逻辑优先使用 Web 标准 API；保持 async-first。
+
+### 2) Isolation（隔离与自包含）
+- 每个应用在 `public/apps/<app-name>/` 下必须功能闭环。
+- **禁止跨应用修改代码**：只改你正在实现的那个 app 的目录与其对应的后端目录。
+- 修改 `public/index.html`（大厅）时：**只允许追加入口卡片**，不得破坏既有布局与链接。
+
+### 3) Security（安全与 API 管理）
+- **严禁**在任何前端 `.html` / `.js` 中写入 API Key / Token / Secret。
+- 所有敏感调用必须走 `/api/**`，并从 `env` 读取 Secrets（用 `wrangler secret put <NAME>` 管理）。
+- 对敏感/昂贵能力（外部 API / Workers AI）必须加入：
+  - **鉴权（如需）**：header/token/Turnstile 等
+  - **速率限制**：按 IP/用户/令牌维度（可用 KV/DO）
+  - **超时与降级**：出错必须有 fallback / graceful degradation
+
+### 4) Performance（性能）
+- 静态资源可优先用 CDN（Alpine/Vue/Tailwind），并设置合理缓存策略。
+- 应用必须包含 Loading/Skeleton，避免阻塞主线程的长任务。
+- 优先 atomic CSS 风格；避免引入笨重依赖拖慢孵化器。
+
+## 变更策略（你在实现需求时的默认动作）
+- 新增一个 App：
+  - 前端：从 `public/apps/_template/` 复制并改名为 `public/apps/<app-name>/`
+  - 后端（可选）：新增 `src/apps/<app-name>/` handlers，并挂载到 `/api/<app-name>/**`
+  - 配置绑定（可选）：改 `wrangler.toml`，按需最小化绑定
+  - 注册入口：在 `public/index.html` 追加一个 Bento Card 并标记状态（Alpha/Beta/Stable）
+- 修复/增强时：尽量小步提交、局部改动，避免改动无关 App。
+
+## 开发与部署提示（不强制，但建议）
+- 本地开发：`wrangler dev`
+- 部署：`wrangler deploy`
+
+## 输出与协作要求（对 AI 的要求）
+- 任何时候优先保证：安全红线、目录规范、路由约定、隔离原则不被破坏。
+- 不确定时先查现有实现（路由/中间件/入口），不要“臆造”与 README 冲突的架构。
+

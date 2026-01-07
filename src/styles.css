@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+@theme {
+  --color-lab-bg: #0b1020;
+  --color-lab-accent: #7c3aed;
+  --color-lab-border: rgba(255, 255, 255, 0.12);
+  --color-lab-panel: rgba(255, 255, 255, 0.06);
+}
+
+@layer base {
+  body {
+    @apply bg-lab-bg text-white/90 antialiased min-h-screen;
+    background: radial-gradient(1200px 600px at 20% 10%, rgba(124, 58, 237, 0.25), transparent 60%),
+                radial-gradient(900px 450px at 80% 0%, rgba(56, 189, 248, 0.18), transparent 55%),
+                #0b1020;
+  }
+}

@@ -1,0 +1,85 @@
+You are the AI Coding Agent for this repository (WebUtilityKit Lab / AI Incubator). Please treat the following as global context and hard constraints, with priority over general preferences.
+
+## Project Overview (Read before acting)
+- **Domain**: `lab.webutilitykit.com`
+- **Infrastructure**: Cloudflare Global Network (Edge Computing)
+- **Runtime (Primary)**: Cloudflare Workers + Workers Static Assets (hosted via `public/` directory)
+- **Positioning**: An "incubator" hosting multiple small tools (multi-entry, multi-route, shared infrastructure), which may eventually migrate to the main site `webutilitykit.com`.
+
+## Recommended Architecture (Mandatory)
+- **Default Recommendation**: Single Worker unified entry + Static Asset hosting + Layered API routing.
+- **Request Flow**:
+  - `GET /`, `/apps/**`, `/assets/**`: Distributed by Static Assets (static resources).
+  - `/api/**`: Hits Worker logic (routing/middleware/handlers).
+- Workers entry follows the modular format: `export default { fetch(request, env, ctx) { ... } }`
+
+## API Framework (Mandatory)
+- **Hono is the standard API router for this repo**.
+  - All `/api/**` routing should be defined in Hono (routes/middleware/notFound/onError).
+  - In `src/index.ts`, keep the fetch-level dispatch minimal:
+    - `/api/**` → `honoApp.fetch(request, env, ctx)`
+    - everything else → `env.ASSETS.fetch(request)` (Workers Static Assets)
+  - Avoid re-introducing large `if/else` trees for API routing in `fetch()`.
+
+## Directory Structure & Placement Norms (Hard Constraints)
+Do NOT scatter files in the root directory. New content must be categorized into one of the following:
+- `public/`: Root for static resources (distributed via Workers Static Assets).
+  - `public/index.html`: Lab Dashboard (entry point for all Apps).
+  - `public/assets/`: Global static resources (Logo / Global CSS / Common Libs).
+  - `public/apps/<app-name>/`: Frontend for each App (self-contained).
+- `src/`: Worker source code (unified entry, routing, middleware, handlers).
+  - `src/index.ts`: Worker entry (fetch).
+  - `src/router/`: Routing and dispatching (`/api/**`).
+  - `src/middleware/`: Shared middleware (auth/cors/rate-limit/logging).
+  - `src/api/`: Platform-level public APIs (e.g., health/version/usage/ai-proxy).
+  - `src/apps/<app-name>/`: Backend logic for each App (handlers).
+
+## Routing Conventions (Must Align)
+- **Static Pages**
+  - `/` → `public/index.html`
+  - `/apps/<app-name>/...` → `public/apps/<app-name>/...`
+  - `/assets/...` → `public/assets/...`
+- **API**
+  - `/api/<app-name>/...` → `src/apps/<app-name>/...`
+  - `/api/_/health`, `/api/_/version` → `src/api/...`
+- **Versioning**: It is recommended to introduce versioning from day one (e.g., `/api/v1/...`) to avoid breaking changes. Follow existing patterns if already implemented.
+
+## AI Agent Development Guidelines (Crucial)
+### 1) Edge-First
+- Resolve logic within the Worker whenever possible; avoid unnecessary external dependencies.
+- Access D1/KV/R2/AI bindings via `env` rather than hard-coding.
+- Prioritize Web Standard APIs in Worker logic; remain async-first.
+
+### 2) Isolation & Self-Containment
+- Each application must be functionally self-contained under `public/apps/<app-name>/`.
+- **No Cross-App Modification**: Only modify the directory of the app you are currently implementing and its corresponding backend directory.
+- When modifying `public/index.html` (Dashboard): **Only append entry cards**; do not disrupt existing layout or links.
+
+### 3) Security & API Management
+- **Strictly Prohibited**: Do NOT write API Keys / Tokens / Secrets into any frontend `.html` or `.js` files.
+- All sensitive calls must go through `/api/**` and read secrets from `env` (managed via `wrangler secret put <NAME>`).
+- For sensitive or expensive capabilities (External APIs / Workers AI), you MUST include:
+  - **Authentication (if needed)**: Headers, tokens, Turnstile, etc.
+  - **Rate Limiting**: Dimensioned by IP/User/Token (using KV/Durable Objects).
+  - **Timeouts & Fallbacks**: Ensure graceful degradation upon errors.
+
+### 4) Performance
+- Prioritize CDNs for static resources (Alpine/Vue/Tailwind) with appropriate caching strategies.
+- Apps must include Loading/Skeleton states to avoid blocking the main thread with long tasks.
+- Prioritize Atomic CSS styles; avoid heavy dependencies that slow down the incubator.
+
+## Change Strategy (Default Actions for Implementation)
+- **Adding a New App**:
+  1. **Frontend**: Copy from `public/apps/_template/` and rename to `public/apps/<app-name>/`.
+  2. **Backend (Optional)**: Add handlers in `src/apps/<app-name>/` and mount them under `/api/<app-name>/**`.
+  3. **Configuration (Optional)**: Update `wrangler.toml` with minimal necessary bindings.
+  4. **Registration**: Append a Bento Card to `public/index.html` and mark its status (Alpha/Beta/Stable).
+- **Fixing/Enhancing**: Use small, atomic commits and localized changes; avoid touching unrelated Apps.
+
+## Development & Deployment Tips
+- Local Development: `wrangler dev`
+- Deployment: `wrangler deploy`
+
+## Output & Collaboration Requirements
+- Always ensure: Security redlines, directory norms, routing conventions, and isolation principles are NOT violated.
+- When in doubt: Check existing implementations (routes/middleware/entries) first; do not "invent" architectures that conflict with the README.

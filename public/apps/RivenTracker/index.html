@@ -1,0 +1,738 @@
+<!doctype html>
+<html lang="zh-CN" class="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Riven Tracker - WebUtilityKit Lab</title>
+    <link rel="stylesheet" href="/assets/tailwind.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
+    <style>
+      .search-results {
+        max-height: 300px;
+        overflow-y: auto;
+      }
+      /* Skeleton Animation */
+      @keyframes pulse-bg {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.5; }
+      }
+      .animate-pulse-bg {
+        animation: pulse-bg 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+      }
+      .skeleton-bar {
+        background: linear-gradient(90deg, rgba(148, 163, 184, 0.1), rgba(148, 163, 184, 0.2), rgba(148, 163, 184, 0.1));
+        background-size: 200% 100%;
+        animation: skeleton-loading 1.5s infinite;
+      }
+      @keyframes skeleton-loading {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      .loading-spinner {
+        border: 2px solid rgba(255, 255, 255, 0.1);
+        border-left-color: #6366f1;
+        border-radius: 50%;
+        width: 1.5rem;
+        height: 1.5rem;
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  </head>
+  <body class="bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-200 font-sans min-h-screen selection:bg-violet-500/30">
+    <main class="max-w-7xl mx-auto px-4 py-6 md:py-10">
+      <!-- 头部导航 -->
+      <header class="flex flex-row gap-4 items-center justify-between p-4 border border-slate-200 dark:border-slate-800 rounded-2xl bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl shadow-sm">
+        <div class="flex items-center gap-3">
+          <a href="/" class="w-10 h-10 rounded-xl flex items-center justify-center font-black text-xs tracking-widest border border-slate-200 dark:border-white/10 bg-gradient-to-br from-violet-500/20 to-sky-400/10 shadow-inner hover:scale-105 transition-transform">
+            LAB
+          </a>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-lg font-bold text-slate-900 dark:text-white">Riven Tracker</h1>
+              <span class="px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-bold border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
+                Beta
+              </span>
+            </div>
+            <p class="hidden sm:block text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Warframe 紫卡底价趋势追踪</p>
+          </div>
+        </div>
+        <nav>
+          <a href="/" class="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-slate-600 dark:text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
+            <span class="hidden sm:inline">返回大厅</span>
+            <span class="sm:hidden">返回</span>
+          </a>
+        </nav>
+      </header>
+
+      <!-- 搜索与控制区 -->
+      <div class="mt-6 grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- 左侧：搜索与最近 -->
+        <div class="lg:col-span-1 space-y-4">
+          <!-- 搜索卡片 -->
+          <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-violet-500/20 transition-all">
+            <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 flex justify-between items-center">
+              选择武器
+              <kbd class="hidden md:inline-flex items-center px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-[9px] font-mono">ESC</kbd>
+            </label>
+            <div class="relative">
+              <input type="text" id="searchInput" autocomplete="off" placeholder="搜索武器名称..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none transition-all text-sm" />
+              <div id="searchLoader" class="hidden absolute right-3 top-2">
+                <div class="loading-spinner scale-75"></div>
+              </div>
+            </div>
+            <div id="searchResults" class="search-results mt-2 space-y-1 hidden">
+              <!-- Search items will be injected here -->
+            </div>
+          </div>
+
+          <!-- 最近访问 -->
+          <div id="recentContainer" class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hidden">
+            <div class="flex items-center justify-between mb-3 cursor-pointer group" onclick="toggleSection('recentList', 'recentChevron')">
+              <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">最近关注</h3>
+              <svg id="recentChevron" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div id="recentList" class="space-y-1.5 transition-all duration-300">
+              <!-- Recent items -->
+            </div>
+          </div>
+        </div>
+
+        <!-- 中间：图表展示区 -->
+        <div class="lg:col-span-2 space-y-4">
+          <!-- 武器详情卡片 (紧凑) -->
+          <div id="weaponHeader" class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm flex flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-3 min-w-0">
+              <div id="weaponIcon" class="w-12 h-12 rounded-xl bg-slate-100 dark:bg-slate-800 p-1.5 flex items-center justify-center border border-slate-200 dark:border-slate-700 flex-shrink-0">
+                <svg class="w-6 h-6 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2">
+                  <h2 id="currentWeaponName" class="text-lg font-black text-slate-900 dark:text-white tracking-tight truncate">请选择武器</h2>
+                  <button id="copyNameBtn" title="复制名称" class="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 transition-all hidden active:scale-90">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
+                  </button>
+                </div>
+                <p id="weaponSubtext" class="text-slate-500 font-medium text-xs truncate">从左侧搜索或选择一个武器</p>
+              </div>
+            </div>
+            
+            <div id="weaponActions" class="flex-shrink-0 hidden">
+              <a id="wfmLink" target="_blank" class="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-violet-500 text-white hover:bg-violet-600 transition-all shadow-lg shadow-violet-500/20 active:scale-95">
+                <span class="hidden sm:inline">WARFRAME MARKET</span>
+                <span class="sm:hidden">WFM</span>
+                <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/></svg>
+              </a>
+            </div>
+          </div>
+
+          <!-- 趋势图表卡片 (优化高度) -->
+          <div class="p-4 md:p-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm min-h-[400px] flex flex-col">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
+              <div class="flex items-center gap-2">
+                <div class="w-1 h-5 bg-violet-500 rounded-full"></div>
+                <h3 class="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">底价变动趋势</h3>
+              </div>
+              <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
+                <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+                  <button id="modePrice" class="px-2.5 py-1 rounded-md text-[9px] font-bold transition-all bg-white dark:bg-slate-900 shadow-sm text-violet-500">价格</button>
+                  <button id="modeSellers" class="px-2.5 py-1 rounded-md text-[9px] font-bold transition-all text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">卖家数</button>
+                </div>
+                <select id="rangeSelect" class="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-violet-500 outline-none transition-all cursor-pointer">
+                  <option value="24h" selected>24 小时</option>
+                  <option value="48h">48 小时</option>
+                  <option value="7d">7 天</option>
+                  <option value="30d">30 天</option>
+                  <option value="90d">90 天</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 图表容器 -->
+            <div class="flex-grow relative min-h-[250px]">
+              <div id="chartLoading" class="hidden absolute inset-0 flex items-center justify-center bg-white/50 dark:bg-slate-900/50 backdrop-blur-sm z-10 rounded-xl">
+                 <div class="flex flex-col items-center gap-3">
+                   <div class="loading-spinner"></div>
+                   <span class="text-[11px] font-bold text-slate-500">加载实时采样...</span>
+                 </div>
+              </div>
+              <div id="chartEmpty" class="absolute inset-0 flex items-center justify-center text-slate-400 flex-col gap-3">
+                <svg class="w-10 h-10 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                <p class="text-xs font-medium">请先选择武器以查看趋势</p>
+              </div>
+              <canvas id="trendChart"></canvas>
+            </div>
+            
+            <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div class="space-y-1">
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">平均采样价</span>
+                <div id="avgPrice" class="text-base font-mono font-bold text-slate-900 dark:text-white">--</div>
+              </div>
+              <div class="space-y-1">
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">价格波动 (24h)</span>
+                <div id="priceChange" class="text-base font-mono font-bold">--</div>
+              </div>
+              <div class="space-y-1">
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">In-Game 卖家</span>
+                <div id="activeOrders" class="text-base font-mono font-bold text-slate-900 dark:text-white">--</div>
+              </div>
+              <div class="space-y-1 hidden md:block">
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">计算模型</span>
+                <div class="text-[9px] font-medium text-slate-500 leading-tight">Top 5 加权底价</div>
+              </div>
+            </div>
+
+            <!-- 数据表格 (更加紧凑) -->
+            <div id="dataTableContainer" class="mt-6 hidden">
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-[10px] font-bold text-slate-900 dark:text-white uppercase tracking-widest border-l-3 border-violet-500 pl-2">采样详情 (In-Game)</h3>
+              </div>
+              <div class="overflow-x-auto border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50/30 dark:bg-black/20">
+                <table class="w-full text-left text-[10px]">
+                  <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
+                    <tr>
+                      <th class="px-3 py-2">时间 (UTC)</th>
+                      <th class="px-3 py-2 text-right">加权价</th>
+                      <th class="px-3 py-2 text-right">最低 (P1)</th>
+                      <th class="px-3 py-2 text-right">P5</th>
+                      <th class="px-3 py-2 text-right">P10</th>
+                    </tr>
+                  </thead>
+                  <tbody id="trendTableBody" class="divide-y divide-slate-100 dark:divide-slate-800 text-slate-600 dark:text-slate-400">
+                    <!-- Data rows injected here -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 右侧：活跃度榜单 -->
+        <div class="lg:col-span-1 space-y-4">
+          <!-- 市场热度榜 (优化) -->
+          <div id="hotContainer" class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
+            <div class="flex items-center justify-between mb-3 cursor-pointer group" onclick="toggleSection('hotList', 'hotChevron')">
+              <div class="flex items-center gap-2">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">活跃度榜单</h3>
+                <span class="text-[8px] text-slate-400 px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800">In-Game</span>
+              </div>
+              <svg id="hotChevron" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+            </div>
+            <div id="hotList" class="space-y-2 transition-all duration-300">
+              <!-- Loading items -->
+              <div class="animate-pulse space-y-2">
+                <div class="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                <div class="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+                <div class="h-9 bg-slate-100 dark:bg-slate-800 rounded-xl"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 底部统计信息 -->
+      <div id="statsCard" class="mt-8 p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <h3 class="font-bold text-slate-900 dark:text-white text-[11px] flex items-center gap-2 flex-shrink-0">
+            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            系统状态
+          </h3>
+          <div class="flex flex-wrap items-center gap-x-8 gap-y-2">
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-slate-500">追踪武器数</span>
+              <span id="trackedCount" class="font-mono font-bold text-slate-900 dark:text-white">--</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-slate-500">采样间隔</span>
+              <span class="font-mono text-slate-900 dark:text-white">30 min</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-slate-500">最后更新</span>
+              <span id="lastUpdate" class="font-mono text-slate-900 dark:text-white">--</span>
+            </div>
+            <div class="flex items-center gap-2 text-[10px]">
+              <span class="text-slate-500">数据源</span>
+              <span class="text-slate-400">Warframe Market</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <script>
+      const searchInput = document.getElementById('searchInput');
+      const searchResults = document.getElementById('searchResults');
+      const searchLoader = document.getElementById('searchLoader');
+      const trendChartCtx = document.getElementById('trendChart').getContext('2d');
+      const chartLoading = document.getElementById('chartLoading');
+      const chartEmpty = document.getElementById('chartEmpty');
+      const currentWeaponName = document.getElementById('currentWeaponName');
+      const weaponSubtext = document.getElementById('weaponSubtext');
+      const rangeSelect = document.getElementById('rangeSelect');
+      const trackedCount = document.getElementById('trackedCount');
+      const lastUpdate = document.getElementById('lastUpdate');
+      const recentContainer = document.getElementById('recentContainer');
+      const recentList = document.getElementById('recentList');
+      const hotList = document.getElementById('hotList');
+      const copyNameBtn = document.getElementById('copyNameBtn');
+      const wfmLink = document.getElementById('wfmLink');
+      const weaponActions = document.getElementById('weaponActions');
+      const avgPrice = document.getElementById('avgPrice');
+      const priceChange = document.getElementById('priceChange');
+      const activeOrders = document.getElementById('activeOrders');
+      const modePriceBtn = document.getElementById('modePrice');
+      const modeSellersBtn = document.getElementById('modeSellers');
+
+      const trendTableBody = document.getElementById('trendTableBody');
+      const dataTableContainer = document.getElementById('dataTableContainer');
+
+      let chart = null;
+      let currentWeapon = null;
+      let searchTimeout = null;
+      let currentChartMode = 'price'; // 'price' or 'sellers'
+      let lastTrendData = null;
+      const RECENT_KEY = 'riven_tracker_recent_v1';
+
+      function getThumbUrl(thumb) {
+        if (!thumb) return '';
+        return thumb.startsWith('http') ? thumb : `https://warframe.market/static/assets/${thumb}`;
+      }
+
+      window.toggleSection = function(elementId, chevronId) {
+        const element = document.getElementById(elementId);
+        const chevron = document.getElementById(chevronId);
+        const isHidden = element.classList.contains('hidden');
+        
+        if (isHidden) {
+          element.classList.remove('hidden');
+          chevron.style.transform = 'rotate(0deg)';
+        } else {
+          element.classList.add('hidden');
+          chevron.style.transform = 'rotate(-90deg)';
+        }
+      };
+
+      // 初始化健康检查
+      async function initHealth() {
+        try {
+          const resp = await fetch('/api/RivenTracker/health');
+          const data = await resp.json();
+          trackedCount.textContent = data.tracked_weapon_count;
+          lastUpdate.textContent = data.last_tick_utc ? luxon.DateTime.fromISO(data.last_tick_utc).toRelative({ locale: 'zh' }) : '从未';
+        } catch (e) {}
+      }
+
+      // 获取热门武器
+      async function initHotWeapons() {
+        try {
+          const resp = await fetch('/api/RivenTracker/hot-weapons?limit=10');
+          const { data } = await resp.json();
+          if (!data || data.length === 0) {
+            hotList.innerHTML = '<div class="text-xs text-slate-400 italic py-2">暂无采样数据</div>';
+            return;
+          }
+          
+          hotList.innerHTML = data.map((w, index) => {
+            const displayName = w.name_zh || w.name_en;
+            return `
+            <div onclick='selectWeapon(${JSON.stringify(w)})' class="group flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 relative overflow-hidden">
+              <div class="absolute left-0 top-0 bottom-0 w-0.5 bg-violet-500 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <div class="flex-shrink-0 w-5 h-5 flex items-center justify-center text-[9px] font-black text-slate-300 group-hover:text-violet-500 transition-colors">
+                ${index + 1}
+              </div>
+              <div class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 p-1 flex-shrink-0">
+                <img src="${getThumbUrl(w.thumb)}" class="w-full h-full object-contain" />
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">${displayName}</div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[9px] text-emerald-500 font-mono font-bold">${w.active_count} 卖家</span>
+                  <span class="text-[9px] text-slate-400 font-mono">${w.bottom_price} p</span>
+                </div>
+              </div>
+            </div>
+          `;}).join('');
+        } catch (e) {
+          hotList.innerHTML = '<div class="text-xs text-rose-400 italic">榜单加载失败</div>';
+        }
+      }
+
+      // 最近搜索管理
+      function getRecent() {
+        try {
+          return JSON.parse(localStorage.getItem(RECENT_KEY) || '[]');
+        } catch (e) { return []; }
+      }
+
+      function saveRecent(weapon) {
+        let recent = getRecent();
+        recent = [weapon, ...recent.filter(w => w.slug !== weapon.slug)].slice(0, 5);
+        localStorage.setItem(RECENT_KEY, JSON.stringify(recent));
+        renderRecent();
+      }
+
+      function renderRecent() {
+        const recent = getRecent();
+        if (recent.length === 0) {
+          recentContainer.classList.add('hidden');
+          return;
+        }
+        recentContainer.classList.remove('hidden');
+        recentList.innerHTML = recent.map(w => {
+          const displayName = w.name_zh || w.name_en;
+          return `
+          <div onclick='selectWeapon(${JSON.stringify(w)})' class="group flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700">
+            <div class="w-7 h-7 rounded-lg bg-slate-100 dark:bg-slate-800 p-1 flex-shrink-0">
+              <img src="${getThumbUrl(w.thumb)}" class="w-full h-full object-contain" />
+            </div>
+            <div class="flex-grow min-w-0">
+              <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">${displayName}</div>
+              <div class="text-[9px] text-slate-500 uppercase truncate">${w.group}</div>
+            </div>
+            <svg class="w-3.5 h-3.5 text-slate-300 opacity-0 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+          </div>
+        `;}).join('');
+      }
+
+      // 搜索逻辑
+      searchInput.addEventListener('input', (e) => {
+        const q = e.target.value.trim();
+        clearTimeout(searchTimeout);
+        if (q.length < 2) {
+          searchResults.classList.add('hidden');
+          return;
+        }
+
+        searchTimeout = setTimeout(async () => {
+          searchLoader.classList.remove('hidden');
+          try {
+            const resp = await fetch(`/api/RivenTracker/weapons?q=${encodeURIComponent(q)}`);
+            const { data } = await resp.json();
+            renderSearchResults(data);
+          } finally {
+            searchLoader.classList.add('hidden');
+          }
+        }, 300);
+      });
+
+      searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          searchInput.value = '';
+          searchResults.classList.add('hidden');
+        }
+      });
+
+      function renderSearchResults(weapons) {
+        searchResults.innerHTML = '';
+        if (weapons.length === 0) {
+          searchResults.innerHTML = '<div class="p-4 text-sm text-slate-500 italic text-center">未找到匹配武器</div>';
+        } else {
+          weapons.forEach(w => {
+            const displayName = w.name_zh || w.name_en;
+            const div = document.createElement('div');
+            div.className = 'group p-2 hover:bg-violet-50 dark:hover:bg-violet-500/10 cursor-pointer rounded-xl transition-all flex items-center gap-3 border border-transparent hover:border-violet-200 dark:hover:border-violet-500/20';
+            div.innerHTML = `
+              <div class="w-8 h-8 rounded-lg bg-slate-100 dark:bg-slate-800 p-1 flex-shrink-0 group-hover:scale-110 transition-transform">
+                <img src="${getThumbUrl(w.thumb)}" class="w-full h-full object-contain" />
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="text-xs font-bold text-slate-900 dark:text-white group-hover:text-violet-500 transition-colors truncate">${displayName}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-[9px] px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase font-bold tracking-tight">${w.group}</span>
+                </div>
+              </div>
+            `;
+            div.onclick = () => selectWeapon(w);
+            searchResults.appendChild(div);
+          });
+        }
+        searchResults.classList.remove('hidden');
+      }
+
+      window.selectWeapon = function(weapon) {
+        currentWeapon = weapon;
+        searchResults.classList.add('hidden');
+        searchInput.value = '';
+        currentWeaponName.textContent = weapon.name_zh || weapon.name_en;
+        weaponSubtext.textContent = `${weapon.rivenType || '未知类型'} | 倾向: ${weapon.disposition} | MR ${weapon.req_mr}`;
+        
+        // 更新图标
+        const iconContainer = document.getElementById('weaponIcon');
+        iconContainer.innerHTML = `<img src="${getThumbUrl(weapon.thumb)}" class="w-full h-full object-contain p-1" />`;
+        iconContainer.classList.remove('bg-slate-100', 'dark:bg-slate-800');
+        iconContainer.classList.add('bg-white', 'dark:bg-slate-900');
+
+        // 更新链接与操作
+        copyNameBtn.classList.remove('hidden');
+        weaponActions.classList.remove('hidden');
+        wfmLink.href = `https://warframe.market/zh-hans/auctions/search?type=riven&sort_by=price_asc&weapon_url_name=${weapon.slug}`;
+
+        saveRecent(weapon);
+        loadTrend();
+      };
+
+      copyNameBtn.onclick = () => {
+        if (!currentWeapon) return;
+        navigator.clipboard.writeText(currentWeapon.name_en).then(() => {
+          const originalIcon = copyNameBtn.innerHTML;
+          copyNameBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="text-emerald-500"><polyline points="20 6 9 17 4 12"/></svg>';
+          setTimeout(() => copyNameBtn.innerHTML = originalIcon, 2000);
+        });
+      };
+
+      rangeSelect.addEventListener('change', () => {
+        if (currentWeapon) loadTrend();
+      });
+
+      async function loadTrend() {
+        if (!currentWeapon) return;
+        chartLoading.classList.remove('hidden');
+        chartEmpty.classList.add('hidden');
+        try {
+          const range = rangeSelect.value;
+          const resp = await fetch(`/api/RivenTracker/bottom-trend?weapon=${currentWeapon.slug}&range=${range}`);
+          const data = await resp.json();
+          lastTrendData = data;
+          renderChart(data);
+          updateStats(data);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          chartLoading.classList.add('hidden');
+        }
+      }
+
+      // 模式切换
+      modePriceBtn.onclick = () => {
+        if (currentChartMode === 'price') return;
+        currentChartMode = 'price';
+        updateModeUI();
+        if (lastTrendData) renderChart(lastTrendData);
+      };
+
+      modeSellersBtn.onclick = () => {
+        if (currentChartMode === 'sellers') return;
+        currentChartMode = 'sellers';
+        updateModeUI();
+        if (lastTrendData) renderChart(lastTrendData);
+      };
+
+      function updateModeUI() {
+        const activeClass = 'bg-white dark:bg-slate-900 shadow-sm text-violet-500';
+        const inactiveClass = 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
+        
+        if (currentChartMode === 'price') {
+          modePriceBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeClass}`;
+          modeSellersBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${inactiveClass}`;
+        } else {
+          modePriceBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${inactiveClass}`;
+          modeSellersBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeClass}`;
+        }
+      }
+
+      function updateStats(trendData) {
+        if (!trendData.data || trendData.data.length === 0) return;
+        
+        const prices = trendData.data.map(d => d.bottom_price);
+        const avg = Math.round(prices.reduce((a, b) => a + b, 0) / prices.length);
+        avgPrice.textContent = `${avg} p`;
+        
+        const lastPrice = prices[prices.length - 1];
+        const prevPrice = prices[prices.length - 2] || lastPrice;
+        const diff = lastPrice - prevPrice;
+        const percent = ((diff / prevPrice) * 100).toFixed(1);
+        
+        if (diff > 0) {
+          priceChange.textContent = `+${diff} (+${percent}%)`;
+          priceChange.className = 'text-lg font-mono font-bold text-emerald-500';
+        } else if (diff < 0) {
+          priceChange.textContent = `${diff} (${percent}%)`;
+          priceChange.className = 'text-lg font-mono font-bold text-rose-500';
+        } else {
+          priceChange.textContent = '持平';
+          priceChange.className = 'text-lg font-mono font-bold text-slate-400';
+        }
+
+        const latestSample = trendData.data[trendData.data.length - 1];
+        // 优先显示真实活跃订单数，如果没有（旧数据）则显示采样数
+        activeOrders.textContent = latestSample.active_count || latestSample.sample_count || '--';
+      }
+
+      function renderTable(data) {
+        if (!data || data.length === 0) {
+          dataTableContainer.classList.add('hidden');
+          return;
+        }
+        dataTableContainer.classList.remove('hidden');
+        // 取最近 10 条展示在表格中
+        const recentData = [...data].reverse().slice(0, 10);
+        trendTableBody.innerHTML = recentData.map(d => `
+          <tr class="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+            <td class="px-4 py-3 font-mono text-[10px]">${luxon.DateTime.fromISO(d.ts).toFormat('MM-dd HH:mm')}</td>
+            <td class="px-4 py-3 text-right font-bold text-violet-500">${d.bottom_price || '--'}</td>
+            <td class="px-4 py-3 text-right">${d.min_price || '--'}</td>
+            <td class="px-4 py-3 text-right">${d.p5_price || '--'}</td>
+            <td class="px-4 py-3 text-right font-mono text-slate-500">
+              ${(d.active_count < 10) ? '<span class="text-[9px] text-slate-400 italic">不足10人</span>' : (d.p10_price || '--')}
+            </td>
+          </tr>
+        `).join('');
+      }
+
+      function renderChart(trendData) {
+        const labels = trendData.data.map(d => d.ts);
+        const range = trendData.meta.range;
+        
+        // 根据模式选择数据集
+        let datasets = [];
+        const isDark = document.documentElement.classList.contains('dark');
+
+        if (currentChartMode === 'price') {
+          datasets = [
+            {
+              label: '加权底价 (Platinum)',
+              data: trendData.data.map(d => ({ x: d.ts, y: d.bottom_price })),
+              borderColor: '#6366f1',
+              borderWidth: 3,
+              backgroundColor: 'rgba(99, 102, 241, 0.05)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 0,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#6366f1',
+              pointHoverBorderColor: '#fff',
+              pointHoverBorderWidth: 2
+            },
+            {
+              label: '绝对最小价',
+              data: trendData.data.map(d => ({ x: d.ts, y: d.min_price })),
+              borderColor: isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
+              borderWidth: 1,
+              borderDash: [5, 5],
+              pointRadius: 0,
+              fill: false,
+              tension: 0.4
+            }
+          ];
+        } else {
+          datasets = [
+            {
+              label: '游戏中卖家数',
+              data: trendData.data.map(d => ({ x: d.ts, y: d.active_count ?? d.sample_count ?? 0 })),
+              borderColor: '#10b981',
+              borderWidth: 3,
+              backgroundColor: 'rgba(16, 185, 129, 0.05)',
+              fill: true,
+              tension: 0.4,
+              pointRadius: 0,
+              pointHoverRadius: 6,
+              pointHoverBackgroundColor: '#10b981',
+              pointHoverBorderColor: '#fff',
+              pointHoverBorderWidth: 2
+            }
+          ];
+        }
+        
+        // Render Table
+        renderTable(trendData.data);
+
+        if (chart) chart.destroy();
+
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+
+        // 计算 X 轴范围
+        const now = luxon.DateTime.now();
+        let minDate;
+        const rangeMap = {
+          '24h': { hours: 24 },
+          '48h': { hours: 48 },
+          '7d': { days: 7 },
+          '30d': { days: 30 },
+          '90d': { days: 90 }
+        };
+        minDate = now.minus(rangeMap[range] || { days: 30 });
+
+        chart = new Chart(trendChartCtx, {
+          type: 'line',
+          data: {
+            datasets: datasets
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            scales: {
+              x: {
+                type: 'time',
+                min: minDate.toISO(),
+                max: now.toISO(),
+                time: { 
+                  unit: (range === '24h' || range === '48h') ? 'hour' : (range === '7d' ? 'day' : 'week'),
+                  displayFormats: {
+                    hour: 'HH:mm',
+                    day: 'MM-dd',
+                    week: 'MM-dd'
+                  }
+                },
+                grid: { display: false },
+                ticks: { 
+                  color: textColor, 
+                  font: { size: 10 },
+                  maxRotation: 0,
+                  autoSkip: true,
+                  maxTicksLimit: range === '24h' ? 8 : 6
+                }
+              },
+              y: {
+                beginAtZero: currentChartMode === 'sellers',
+                grid: { color: gridColor },
+                ticks: { 
+                  color: textColor, 
+                  font: { size: 10, family: 'monospace' },
+                  callback: function(value) {
+                    return currentChartMode === 'price' ? value : Math.round(value);
+                  }
+                }
+              }
+            },
+            plugins: {
+              legend: {
+                display: false
+              },
+              tooltip: {
+                backgroundColor: isDark ? '#1e293b' : '#fff',
+                titleColor: isDark ? '#f1f5f9' : '#0f172a',
+                bodyColor: isDark ? '#94a3b8' : '#64748b',
+                borderColor: isDark ? '#334155' : '#e2e8f0',
+                borderWidth: 1,
+                padding: 12,
+                boxPadding: 4,
+                usePointStyle: true,
+                callbacks: {
+                  label: function(context) {
+                    const unit = currentChartMode === 'price' ? ' p' : ' 人';
+                    return ` ${context.dataset.label.split(' (')[0]}: ${context.parsed.y}${unit}`;
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      renderRecent();
+      initHealth();
+      initHotWeapons();
+    </script>
+  </body>
+</html>
+

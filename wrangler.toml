@@ -1,0 +1,23 @@
+name = "webutilitykit-lab"
+main = "src/index.ts"
+compatibility_date = "2026-01-02"
+
+# Workers Static Assets: 将 public/ 作为静态资源目录，并通过 env.ASSETS.fetch() 交给边缘分发
+assets = { directory = "./public", binding = "ASSETS" }
+
+[vars]
+APP_NAME = "webutilitykit-lab"
+APP_VERSION = "0.1.0"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "webutilitykit-lab-db"
+database_id = "d2f50fd6-5410-4913-b7af-19a767e9ce25"
+
+[triggers]
+crons = ["*/5 * * * *", "0 3 * * *"]
+
+[[routes]]
+pattern = "lab.webutilitykit.com"
+custom_domain = true
+

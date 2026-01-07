@@ -1,0 +1,24 @@
+{
+  "name": "webutilitykit-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "build:css": "@tailwindcss -i ./src/styles.css -o ./public/assets/tailwind.css",
+    "dev:css": "@tailwindcss -i ./src/styles.css -o ./public/assets/tailwind.css --watch",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.54.0",
+    "autoprefixer": "^10.4.23",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.54.0",
+    "@tailwindcss/cli": "^4.1.18",
+    "tailwindcss": "^4.1.18"
+  }
+}
