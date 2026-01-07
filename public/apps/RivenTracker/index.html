@@ -137,7 +137,6 @@
               <div class="flex items-center gap-2">
                 <div class="w-1 h-5 bg-violet-500 rounded-full"></div>
                 <h3 class="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">底价变动趋势</h3>
-                <span id="fallbackBadge" class="hidden px-1.5 py-0.5 rounded text-[8px] font-bold bg-amber-500/10 text-amber-500 border border-amber-500/20 animate-pulse">备份模式</span>
               </div>
               <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                 <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
@@ -217,12 +216,13 @@
         <div class="lg:col-span-1 space-y-4">
           <!-- 市场热度榜 (优化) -->
           <div id="hotContainer" class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
-            <div class="flex items-center justify-between mb-3 cursor-pointer group" onclick="toggleSection('hotList', 'hotChevron')">
-              <div class="flex items-center gap-2">
-                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">活跃度榜单</h3>
+            <div class="flex items-center justify-between mb-3">
+              <div class="flex items-center gap-2 cursor-pointer group" onclick="showHotWeaponsModal()">
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-violet-500 transition-colors">高值武器排行</h3>
                 <span class="text-[8px] text-slate-400 px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800">In-Game</span>
+                <svg class="w-3 h-3 text-slate-400 group-hover:text-violet-500 transition-colors opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
               </div>
-              <svg id="hotChevron" xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+              <svg id="hotChevron" onclick="toggleSection('hotList', 'hotChevron')" class="w-3.5 h-3.5 text-slate-400 transition-transform duration-300 cursor-pointer hover:text-slate-600 dark:hover:text-slate-300" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
             </div>
             <div id="hotList" class="space-y-2 transition-all duration-300">
               <!-- Loading items -->
@@ -236,29 +236,87 @@
         </div>
       </div>
 
+      <!-- 热门武器弹窗 -->
+      <div id="hotWeaponsModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4" onclick="closeHotWeaponsModal(event)">
+        <div class="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl max-w-4xl w-full max-h-[80vh] overflow-hidden border border-slate-200 dark:border-slate-800" onclick="event.stopPropagation()">
+          <!-- 弹窗头部 -->
+          <div class="p-4 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between sticky top-0 bg-white dark:bg-slate-900 z-10">
+            <div class="flex items-center gap-3">
+              <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500 to-indigo-500 flex items-center justify-center">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
+              </div>
+              <div>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">热门武器排行</h2>
+                <p class="text-[10px] text-slate-500">基于最近 24 小时底价排序 · 前 50 名</p>
+              </div>
+            </div>
+            <button onclick="closeHotWeaponsModal()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
+              <svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+
+          <!-- 弹窗内容 -->
+          <div class="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
+            <div id="hotWeaponsModalContent" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <!-- 加载状态 -->
+              <div class="col-span-full flex items-center justify-center py-12">
+                <div class="flex flex-col items-center gap-3">
+                  <div class="loading-spinner scale-150"></div>
+                  <span class="text-sm text-slate-500">加载中...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 底部统计信息 -->
       <div id="statsCard" class="mt-8 p-4 bg-slate-50 dark:bg-slate-900/30 border border-slate-200 dark:border-slate-800 rounded-2xl">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <h3 class="font-bold text-slate-900 dark:text-white text-[11px] flex items-center gap-2 flex-shrink-0">
-            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            系统状态
-          </h3>
-          <div class="flex flex-wrap items-center gap-x-8 gap-y-2">
-            <div class="flex items-center gap-2 text-[10px]">
-              <span class="text-slate-500">追踪武器数</span>
-              <span id="trackedCount" class="font-mono font-bold text-slate-900 dark:text-white">--</span>
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <h3 class="font-bold text-slate-900 dark:text-white text-[11px] flex items-center gap-2 flex-shrink-0">
+              <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              系统状态
+            </h3>
+            <div class="flex flex-wrap items-center gap-x-8 gap-y-2">
+              <div class="flex items-center gap-2 text-[10px]">
+                <span class="text-slate-500">追踪武器数</span>
+                <span id="trackedCount" class="font-mono font-bold text-slate-900 dark:text-white">--</span>
+              </div>
+              <div class="flex items-center gap-2 text-[10px]">
+                <span class="text-slate-500">采样策略</span>
+                <span class="font-mono text-slate-900 dark:text-white">分层采样</span>
+              </div>
+              <div class="flex items-center gap-2 text-[10px]">
+                <span class="text-slate-500">最后更新</span>
+                <span id="lastUpdate" class="font-mono text-slate-900 dark:text-white">--</span>
+              </div>
+              <div class="flex items-center gap-2 text-[10px]">
+                <span class="text-slate-500">数据源</span>
+                <span class="text-slate-400">Warframe Market</span>
+              </div>
             </div>
-            <div class="flex items-center gap-2 text-[10px]">
-              <span class="text-slate-500">采样间隔</span>
-              <span class="font-mono text-slate-900 dark:text-white">30 min</span>
-            </div>
-            <div class="flex items-center gap-2 text-[10px]">
-              <span class="text-slate-500">最后更新</span>
-              <span id="lastUpdate" class="font-mono text-slate-900 dark:text-white">--</span>
-            </div>
-            <div class="flex items-center gap-2 text-[10px]">
-              <span class="text-slate-500">数据源</span>
-              <span class="text-slate-400">Warframe Market</span>
+          </div>
+          
+          <!-- 采样策略说明 -->
+          <div class="pt-3 border-t border-slate-200 dark:border-slate-800">
+            <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+              <div class="flex items-center gap-2 text-[10px] text-slate-500">
+                <svg class="w-3.5 h-3.5 text-violet-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                <span class="font-medium">分层采样策略</span>
+              </div>
+              <div class="flex flex-wrap items-center gap-x-6 gap-y-1 text-[10px]">
+                <div class="flex items-center gap-1.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">热门</span>
+                  <span class="text-slate-600 dark:text-slate-400">~20 分钟/轮</span>
+                  <span class="text-slate-400">(前50名)</span>
+                </div>
+                <div class="flex items-center gap-1.5">
+                  <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">冷门</span>
+                  <span class="text-slate-600 dark:text-slate-400">~12 小时/轮</span>
+                  <span class="text-slate-400">(其余武器)</span>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -297,11 +355,7 @@
       let searchTimeout = null;
       let currentChartMode = 'price'; // 'price' or 'sellers'
       let lastTrendData = null;
-      let cosDataCache = null; // 缓存从 COS 加载的全量数据
       const RECENT_KEY = 'riven_tracker_recent_v1';
-      
-      // COS 备份数据配置 (国内访问 fallback)
-      const COS_BACKUP_URL = 'https://riventracker-1361770797.cos.ap-guangzhou.myqcloud.com/riven/export-30d-latest.json';
 
       function getThumbUrl(thumb) {
         if (!thumb) return '';
@@ -332,17 +386,40 @@
         } catch (e) {}
       }
 
-      // 获取热门武器
+      // 获取热门/高价武器
       async function initHotWeapons() {
         try {
-          const resp = await fetch('/api/RivenTracker/hot-weapons?limit=10');
+          // 默认按价格排序，多获取几个以备过滤后不足
+          const resp = await fetch('/api/RivenTracker/hot-weapons?limit=15&sortBy=price');
           const { data } = await resp.json();
           if (!data || data.length === 0) {
             hotList.innerHTML = '<div class="text-xs text-slate-400 italic py-2">暂无采样数据</div>';
             return;
           }
           
-          hotList.innerHTML = data.map((w, index) => {
+          // 过滤掉已知的 bug 武器：Dex Nikana / Dex 侍刃 (官方bug，价格异常)
+          const filteredData = data
+            .filter(w => {
+              const slug = w.slug?.toLowerCase() || '';
+              const nameZh = w.name_zh || '';
+              const nameEn = (w.name_en || '').toLowerCase();
+              
+              // 屏蔽 Dex Nikana / Dex 侍刃
+              return !slug.includes('dex-nikana') && 
+                     !slug.includes('dexnikana') &&
+                     !nameZh.includes('Dex 侍刃') && 
+                     !nameZh.includes('Dex侍刃') &&
+                     !nameEn.includes('dex nikana') &&
+                     !nameEn.includes('dexnikana');
+            })
+            .slice(0, 10);
+          
+          if (filteredData.length === 0) {
+            hotList.innerHTML = '<div class="text-xs text-slate-400 italic py-2">暂无采样数据</div>';
+            return;
+          }
+          
+          hotList.innerHTML = filteredData.map((w, index) => {
             const displayName = w.name_zh || w.name_en;
             return `
             <div onclick='selectWeapon(${JSON.stringify(w)})' class="group flex items-center gap-2 p-1.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700 relative overflow-hidden">
@@ -356,8 +433,8 @@
               <div class="flex-grow min-w-0">
                 <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">${displayName}</div>
                 <div class="flex items-center gap-2">
-                  <span class="text-[9px] text-emerald-500 font-mono font-bold">${w.active_count} 卖家</span>
-                  <span class="text-[9px] text-slate-400 font-mono">${w.min_price} p</span>
+                  <span class="text-[9px] text-violet-500 font-mono font-bold">${w.bottom_price || w.min_price} p</span>
+                  <span class="text-[9px] text-slate-400 font-mono">${w.active_count} 卖家</span>
                 </div>
               </div>
             </div>
@@ -498,69 +575,15 @@
         if (!currentWeapon) return;
         chartLoading.classList.remove('hidden');
         chartEmpty.classList.add('hidden');
-        
-        const range = rangeSelect.value;
-        const weaponSlug = currentWeapon.slug;
-
         try {
-          // 1. 尝试从 Worker API 加载 (设置较短超时)
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // 8秒超时
-          
-          const resp = await fetch(`/api/RivenTracker/bottom-trend?weapon=${weaponSlug}&range=${range}`, {
-            signal: controller.signal
-          });
-          clearTimeout(timeoutId);
-          
-          if (!resp.ok) throw new Error('API_ERROR');
-          
+          const range = rangeSelect.value;
+          const resp = await fetch(`/api/RivenTracker/bottom-trend?weapon=${currentWeapon.slug}&range=${range}`);
           const data = await resp.json();
           lastTrendData = data;
           renderChart(data);
           updateStats(data);
         } catch (e) {
-          console.warn('[Fallback] Worker API failed, trying COS backup...', e);
-          try {
-            // 2. Fallback: 从 COS 加载全量 JSON
-            if (!cosDataCache) {
-              const cosResp = await fetch(COS_BACKUP_URL);
-              if (!cosResp.ok) throw new Error('COS_ERROR');
-              cosDataCache = await cosResp.json();
-            }
-
-            // 3. 从全量数据中筛选当前武器和时间范围
-            const weaponData = cosDataCache.weapons.find(w => w.slug === weaponSlug);
-            if (!weaponData) {
-              throw new Error('WEAPON_NOT_IN_BACKUP');
-            }
-
-            // 根据 range 过滤 ticks
-            const now = luxon.DateTime.now();
-            const rangeMap = { '24h': 24, '48h': 48, '7d': 168, '30d': 720, '90d': 2160 };
-            const hours = rangeMap[range] || 720;
-            const startTime = now.minus({ hours }).toJSDate();
-
-            const filteredTicks = weaponData.ticks.filter(t => new Date(t.ts) >= startTime);
-
-            const fallbackData = {
-              meta: {
-                weapon: weaponSlug,
-                range: range,
-                is_fallback: true,
-                generated_at: cosDataCache.generated_at
-              },
-              data: filteredTicks
-            };
-
-            lastTrendData = fallbackData;
-            renderChart(fallbackData);
-            updateStats(fallbackData);
-            
-            console.log('[Fallback] Successfully loaded data from COS');
-          } catch (fallbackError) {
-            console.error('[Fallback] Both Worker API and COS backup failed', fallbackError);
-            // 这里可以显示一个错误提示 UI
-          }
+          console.error(e);
         } finally {
           chartLoading.classList.add('hidden');
         }
@@ -637,7 +660,7 @@
             <td class="px-4 py-3 text-right">${d.min_price || '--'}</td>
             <td class="px-4 py-3 text-right">${d.p5_price || '--'}</td>
             <td class="px-4 py-3 text-right font-mono text-slate-500">
-              ${(d.active_count < 10) ? '<span class="text-[9px] text-slate-400 italic">不足10人</span>' : (d.p10_price || '--')}
+              ${(d.active_count !== undefined && d.active_count !== null && d.active_count < 10) ? '<span class="text-[9px] text-slate-400 italic">不足10人</span>' : (d.p10_price || '--')}
             </td>
           </tr>
         `).join('');
@@ -646,14 +669,6 @@
       function renderChart(trendData) {
         const labels = trendData.data.map(d => d.ts);
         const range = trendData.meta.range;
-        
-        // 显示/隐藏备份模式标识
-        const fallbackBadge = document.getElementById('fallbackBadge');
-        if (trendData.meta.is_fallback) {
-          fallbackBadge.classList.remove('hidden');
-        } else {
-          fallbackBadge.classList.add('hidden');
-        }
 
         // 根据模式选择数据集
         let datasets = [];
@@ -663,13 +678,13 @@
           datasets = [
             {
               label: '加权底价 (Platinum)',
-              data: trendData.data.map(d => ({ x: d.ts, y: d.bottom_price })),
+              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.bottom_price })),
               borderColor: '#6366f1',
               borderWidth: 3,
               backgroundColor: 'rgba(99, 102, 241, 0.05)',
               fill: true,
               tension: 0.4,
-              pointRadius: 0,
+              pointRadius: 3, // 增加圆点半径，确保单点可见
               pointHoverRadius: 6,
               pointHoverBackgroundColor: '#6366f1',
               pointHoverBorderColor: '#fff',
@@ -677,9 +692,9 @@
             },
             {
               label: '绝对最小价',
-              data: trendData.data.map(d => ({ x: d.ts, y: d.min_price })),
-              borderColor: isDark ? 'rgba(148, 163, 184, 0.2)' : 'rgba(148, 163, 184, 0.3)',
-              borderWidth: 1,
+              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.min_price })),
+              borderColor: isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.6)',
+              borderWidth: 1.5,
               borderDash: [5, 5],
               pointRadius: 0,
               fill: false,
@@ -690,13 +705,13 @@
           datasets = [
             {
               label: '游戏中卖家数',
-              data: trendData.data.map(d => ({ x: d.ts, y: d.active_count ?? d.sample_count ?? 0 })),
+              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.active_count ?? d.sample_count ?? 0 })),
               borderColor: '#10b981',
               borderWidth: 3,
               backgroundColor: 'rgba(16, 185, 129, 0.05)',
               fill: true,
               tension: 0.4,
-              pointRadius: 0,
+              pointRadius: 3,
               pointHoverRadius: 6,
               pointHoverBackgroundColor: '#10b981',
               pointHoverBorderColor: '#fff',
@@ -795,6 +810,88 @@
           }
         });
       }
+
+      // 热门武器弹窗
+      async function showHotWeaponsModal() {
+        const modal = document.getElementById('hotWeaponsModal');
+        const content = document.getElementById('hotWeaponsModalContent');
+        
+        // 显示弹窗
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+        
+        // 显示加载状态
+        content.innerHTML = `
+          <div class="col-span-full flex items-center justify-center py-12">
+            <div class="flex flex-col items-center gap-3">
+              <div class="loading-spinner scale-150"></div>
+              <span class="text-sm text-slate-500">加载热门武器...</span>
+            </div>
+          </div>
+        `;
+        
+        try {
+          // 获取前 50 名热门武器
+          const resp = await fetch('/api/RivenTracker/hot-weapons?limit=50&sortBy=price');
+          const { data } = await resp.json();
+          
+          if (!data || data.length === 0) {
+            content.innerHTML = '<div class="col-span-full text-center text-slate-400 py-12">暂无数据</div>';
+            return;
+          }
+          
+          // 渲染武器列表
+          content.innerHTML = data.map((w, index) => {
+            const displayName = w.name_zh || w.name_en;
+            const rankClass = index === 0 ? 'from-amber-500 to-yellow-500' : 
+                             index === 1 ? 'from-slate-400 to-slate-500' :
+                             index === 2 ? 'from-orange-600 to-amber-700' : 
+                             'from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800';
+            const rankTextClass = index < 3 ? 'text-white' : 'text-slate-600 dark:text-slate-400';
+            
+            return `
+            <div onclick='selectWeapon(${JSON.stringify(w)}); closeHotWeaponsModal();' 
+                 class="group flex items-center gap-3 p-3 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-all border border-transparent hover:border-violet-200 dark:hover:border-violet-500/20 hover:shadow-md">
+              <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${rankClass} flex items-center justify-center font-black text-sm ${rankTextClass} shadow-sm">
+                ${index + 1}
+              </div>
+              <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 p-1.5 flex-shrink-0 group-hover:scale-110 transition-transform">
+                <img src="${getThumbUrl(w.thumb)}" class="w-full h-full object-contain" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22%3E%3Cpath d=%22M13 10V3L4 14h7v7l9-11h-7z%22/%3E%3C/svg%3E'" />
+              </div>
+              <div class="flex-grow min-w-0">
+                <div class="text-sm font-bold text-slate-900 dark:text-white group-hover:text-violet-500 transition-colors truncate">${displayName}</div>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <span class="text-xs px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 uppercase font-bold tracking-tight">${w.group}</span>
+                </div>
+              </div>
+              <div class="flex-shrink-0 text-right">
+                <div class="text-sm font-mono font-bold text-violet-500">${w.bottom_price || w.min_price} p</div>
+                <div class="text-[10px] text-slate-400 font-mono">${w.active_count} 卖家</div>
+              </div>
+            </div>
+          `;}).join('');
+          
+        } catch (e) {
+          console.error('Failed to load hot weapons:', e);
+          content.innerHTML = '<div class="col-span-full text-center text-rose-400 py-12">加载失败，请稍后重试</div>';
+        }
+      }
+      
+      function closeHotWeaponsModal(event) {
+        // 如果提供了 event，检查是否点击的是背景
+        if (event && event.target !== event.currentTarget) return;
+        
+        const modal = document.getElementById('hotWeaponsModal');
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+      
+      // ESC 键关闭弹窗
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+          closeHotWeaponsModal();
+        }
+      });
 
       renderRecent();
       initHealth();

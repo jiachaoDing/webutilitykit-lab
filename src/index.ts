@@ -10,12 +10,6 @@ interface Env {
   DB: D1Database;
   APP_NAME: string;
   APP_VERSION: string;
-  // COS 配置
-  COS_BUCKET?: string;
-  COS_REGION?: string;
-  COS_SECRET_ID?: string;
-  COS_SECRET_KEY?: string;
-  COS_OBJECT_KEY_LATEST?: string;
 }
 
 const api = new Hono<{ Bindings: Env }>();

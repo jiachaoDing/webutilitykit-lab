@@ -22,7 +22,10 @@ export class WfmV2Client {
 
   async getVersions(): Promise<WfmV2Versions> {
     const res = await fetch(`${this.baseUrl}/versions`, {
-      headers: { "Accept": "application/json" }
+      headers: { 
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 WebUtilityKitLab/0.1.0"
+      }
     });
     if (!res.ok) throw new Error(`WFM V2 versions error: ${res.status}`);
     return res.json() as Promise<WfmV2Versions>;
@@ -32,7 +35,8 @@ export class WfmV2Client {
     const res = await fetch(`${this.baseUrl}/riven/weapons`, {
       headers: { 
         "Accept": "application/json",
-        "Language": "zh-hans"
+        "Language": "zh-hans",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 WebUtilityKitLab/0.1.0"
       }
     });
     if (!res.ok) throw new Error(`WFM V2 weapons error: ${res.status}`);
@@ -53,7 +57,10 @@ export class WfmV2Client {
 
   async getRivenAttributes(): Promise<RivenAttribute[]> {
     const res = await fetch(`${this.baseUrl}/riven/attributes`, {
-      headers: { "Accept": "application/json" }
+      headers: { 
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 WebUtilityKitLab/0.1.0"
+      }
     });
     if (!res.ok) throw new Error(`WFM V2 attributes error: ${res.status}`);
     const json: any = await res.json();

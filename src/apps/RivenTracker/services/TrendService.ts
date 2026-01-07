@@ -1,10 +1,12 @@
 import { TickRepo } from "../repos/TickRepo";
 import { WeaponRepo } from "../repos/WeaponRepo";
+import { TrackedRepo } from "../repos/TrackedRepo";
 
 export class TrendService {
   constructor(
     private tickRepo: TickRepo,
-    private weaponRepo: WeaponRepo
+    private weaponRepo: WeaponRepo,
+    private trackedRepo?: TrackedRepo
   ) {}
 
   /**
@@ -67,11 +69,37 @@ export class TrendService {
   }
 
   /**
-   * 获取热门武器（按卖家数排序）
+   * 获取热门武器
    */
-  async getHotWeapons(limit: number = 10) {
-    const results = await this.tickRepo.getLatestHotWeapons(limit);
+  async getHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price') {
+    const results = await this.tickRepo.getLatestHotWeapons(limit, sortBy);
     return { data: results };
+  }
+
+  /**
+   * 获取武器的缓存时间（基于 tier）
+   * @returns 缓存时间（秒）
+   */
+  async getCacheTTL(weaponSlug: string): Promise<number> {
+    if (!this.trackedRepo) return 300; // 默认 5 分钟
+    
+    try {
+      // 查询武器的 tier
+      const weapons = await this.trackedRepo.getEnabledTracked();
+      const weapon = weapons.find(w => w.slug === weaponSlug);
+      
+      if (!weapon) return 300; // 未追踪的武器，默认 5 分钟
+      
+      // 根据 tier 返回不同的缓存时间
+      if (weapon.tier === 'hot') {
+        return 300; // 热门武器：5 分钟
+      } else {
+        return 7200; // 冷门武器：2 小时
+      }
+    } catch (e) {
+      console.error('[TrendService] getCacheTTL failed:', e);
+      return 300; // 出错时默认 5 分钟
+    }
   }
 }
 
