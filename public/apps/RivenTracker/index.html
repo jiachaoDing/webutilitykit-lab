@@ -6,6 +6,7 @@
     <title>Riven Tracker - WebUtilityKit Lab</title>
     <link rel="stylesheet" href="/assets/tailwind.css" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/luxon@3.4.4/build/global/luxon.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.umd.min.js"></script>
     <style>
@@ -143,13 +144,21 @@
                   <button id="modePrice" class="px-2.5 py-1 rounded-md text-[9px] font-bold transition-all bg-white dark:bg-slate-900 shadow-sm text-violet-500">价格</button>
                   <button id="modeSellers" class="px-2.5 py-1 rounded-md text-[9px] font-bold transition-all text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">卖家数</button>
                 </div>
-                <select id="rangeSelect" class="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-violet-500 outline-none transition-all cursor-pointer">
-                  <option value="24h" selected>24 小时</option>
-                  <option value="48h">48 小时</option>
-                  <option value="7d">7 天</option>
-                  <option value="30d">30 天</option>
-                  <option value="90d">90 天</option>
-                </select>
+                <div class="flex items-center gap-2">
+                  <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
+                    <button id="displayModeRaw" class="px-2 py-1 rounded-md text-[9px] font-bold transition-all bg-white dark:bg-slate-900 shadow-sm text-violet-500">原数据</button>
+                    <button id="displayModeAggregated" class="px-2 py-1 rounded-md text-[9px] font-bold transition-all text-slate-500 hover:text-slate-700 dark:hover:text-slate-300">区间聚合</button>
+                  </div>
+                  <select id="rangeSelect" class="bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-violet-500 outline-none transition-all cursor-pointer">
+                    <option value="24h" selected>24 小时</option>
+                    <option value="1h" data-mode="aggregated">1 小时区间</option>
+                    <option value="4h" data-mode="aggregated">4 小时区间</option>
+                    <option value="1d" data-mode="aggregated">1 天区间</option>
+                  </select>
+                  <button id="resetZoomBtn" class="hidden bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-violet-500 outline-none transition-all hover:bg-slate-100 dark:hover:bg-slate-700">
+                    重置缩放
+                  </button>
+                </div>
               </div>
             </div>
 
@@ -174,7 +183,7 @@
                 <div id="avgPrice" class="text-base font-mono font-bold text-slate-900 dark:text-white">--</div>
               </div>
               <div class="space-y-1">
-                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">价格波动 (24h)</span>
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">最新波动</span>
                 <div id="priceChange" class="text-base font-mono font-bold">--</div>
               </div>
               <div class="space-y-1">
@@ -346,6 +355,9 @@
       const activeOrders = document.getElementById('activeOrders');
       const modePriceBtn = document.getElementById('modePrice');
       const modeSellersBtn = document.getElementById('modeSellers');
+      const displayModeRawBtn = document.getElementById('displayModeRaw');
+      const displayModeAggregatedBtn = document.getElementById('displayModeAggregated');
+      const resetZoomBtn = document.getElementById('resetZoomBtn');
 
       const trendTableBody = document.getElementById('trendTableBody');
       const dataTableContainer = document.getElementById('dataTableContainer');
@@ -354,6 +366,7 @@
       let currentWeapon = null;
       let searchTimeout = null;
       let currentChartMode = 'price'; // 'price' or 'sellers'
+      let currentDisplayMode = 'raw'; // 'raw' or 'aggregated'
       let lastTrendData = null;
       const RECENT_KEY = 'riven_tracker_recent_v1';
 
@@ -577,7 +590,8 @@
         chartEmpty.classList.add('hidden');
         try {
           const range = rangeSelect.value;
-          const resp = await fetch(`/api/RivenTracker/bottom-trend?weapon=${currentWeapon.slug}&range=${range}`);
+          const mode = currentDisplayMode === 'aggregated' ? 'aggregated' : 'raw';
+          const resp = await fetch(`/api/RivenTracker/bottom-trend?weapon=${currentWeapon.slug}&range=${range}&mode=${mode}`);
           const data = await resp.json();
           lastTrendData = data;
           renderChart(data);
@@ -604,16 +618,82 @@
         if (lastTrendData) renderChart(lastTrendData);
       };
 
+      // 显示模式切换
+      displayModeRawBtn.onclick = () => {
+        if (currentDisplayMode === 'raw') return;
+        currentDisplayMode = 'raw';
+        updateDisplayModeUI();
+        updateRangeSelectOptions();
+        if (currentWeapon) loadTrend();
+      };
+
+      displayModeAggregatedBtn.onclick = () => {
+        if (currentDisplayMode === 'aggregated') return;
+        currentDisplayMode = 'aggregated';
+        updateDisplayModeUI();
+        updateRangeSelectOptions();
+        if (currentWeapon) loadTrend();
+      };
+
+      resetZoomBtn.onclick = () => {
+        if (!chart) return;
+        const now = luxon.DateTime.now();
+        const initialMin = now.minus({ hours: 24 });
+        chart.zoomScale('x', { min: initialMin.toISO(), max: now.toISO() });
+      };
+
       function updateModeUI() {
         const activeClass = 'bg-white dark:bg-slate-900 shadow-sm text-violet-500';
         const inactiveClass = 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
-        
+
         if (currentChartMode === 'price') {
-          modePriceBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeClass}`;
-          modeSellersBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${inactiveClass}`;
+          modePriceBtn.className = `px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${activeClass}`;
+          modeSellersBtn.className = `px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${inactiveClass}`;
         } else {
-          modePriceBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${inactiveClass}`;
-          modeSellersBtn.className = `px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all ${activeClass}`;
+          modePriceBtn.className = `px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${inactiveClass}`;
+          modeSellersBtn.className = `px-2.5 py-1 rounded-md text-[9px] font-bold transition-all ${activeClass}`;
+        }
+      }
+
+      function updateDisplayModeUI() {
+        const activeClass = 'bg-white dark:bg-slate-900 shadow-sm text-violet-500';
+        const inactiveClass = 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300';
+
+        if (currentDisplayMode === 'raw') {
+          displayModeRawBtn.className = `px-2 py-1 rounded-md text-[9px] font-bold transition-all ${activeClass}`;
+          displayModeAggregatedBtn.className = `px-2 py-1 rounded-md text-[9px] font-bold transition-all ${inactiveClass}`;
+          resetZoomBtn.classList.remove('hidden');
+        } else {
+          displayModeRawBtn.className = `px-2 py-1 rounded-md text-[9px] font-bold transition-all ${inactiveClass}`;
+          displayModeAggregatedBtn.className = `px-2 py-1 rounded-md text-[9px] font-bold transition-all ${activeClass}`;
+          resetZoomBtn.classList.add('hidden');
+        }
+      }
+
+      function updateRangeSelectOptions() {
+        const options = rangeSelect.querySelectorAll('option');
+        options.forEach(option => {
+          const mode = option.getAttribute('data-mode');
+          if (mode) {
+            if (currentDisplayMode === 'raw') {
+              if (mode !== 'aggregated') return;
+              option.style.display = 'none';
+            } else {
+              if (mode === 'aggregated') {
+                option.style.display = 'block';
+              }
+            }
+          } else {
+            // 默认选项 (24h) 只在原数据模式显示
+            option.style.display = currentDisplayMode === 'raw' ? 'block' : 'none';
+          }
+        });
+
+        // 切换模式时自动选择合适的默认选项
+        if (currentDisplayMode === 'aggregated') {
+          rangeSelect.value = '1h'; // 默认选择1小时区间
+        } else {
+          rangeSelect.value = '24h'; // 默认选择24小时
         }
       }
 
@@ -645,6 +725,64 @@
         activeOrders.textContent = latestSample.active_count || latestSample.sample_count || '--';
       }
 
+      function aggregateData(data, range) {
+        if (!data || data.length === 0) return [];
+
+        // 根据range确定聚合间隔（毫秒）
+        const intervalMs = {
+          '1h': 60 * 60 * 1000,      // 1小时
+          '4h': 4 * 60 * 60 * 1000,  // 4小时
+          '1d': 24 * 60 * 60 * 1000   // 1天
+        }[range] || (24 * 60 * 60 * 1000); // 默认1天
+
+        // 按时间间隔分组
+        const grouped = {};
+        data.forEach(item => {
+          const timestamp = new Date(item.ts).getTime();
+          const intervalStart = Math.floor(timestamp / intervalMs) * intervalMs;
+          const key = intervalStart;
+
+          if (!grouped[key]) {
+            grouped[key] = {
+              timestamps: [],
+              bottom_prices: [],
+              min_prices: [],
+              active_counts: [],
+              sample_counts: []
+            };
+          }
+
+          grouped[key].timestamps.push(timestamp);
+          if (item.bottom_price !== null && item.bottom_price !== undefined) {
+            grouped[key].bottom_prices.push(item.bottom_price);
+          }
+          if (item.min_price !== null && item.min_price !== undefined) {
+            grouped[key].min_prices.push(item.min_price);
+          }
+          if (item.active_count !== null && item.active_count !== undefined) {
+            grouped[key].active_counts.push(item.active_count);
+          }
+          if (item.sample_count !== null && item.sample_count !== undefined) {
+            grouped[key].sample_counts.push(item.sample_count);
+          }
+        });
+
+        // 计算每组的平均值
+        return Object.keys(grouped).map(key => {
+          const group = grouped[key];
+          const intervalStart = parseInt(key);
+
+          return {
+            ts: new Date(intervalStart).toISOString(),
+            bottom_price: group.bottom_prices.length > 0 ? Math.round(group.bottom_prices.reduce((a, b) => a + b, 0) / group.bottom_prices.length) : null,
+            min_price: group.min_prices.length > 0 ? Math.round(group.min_prices.reduce((a, b) => a + b, 0) / group.min_prices.length) : null,
+            active_count: group.active_counts.length > 0 ? Math.round(group.active_counts.reduce((a, b) => a + b, 0) / group.active_counts.length) : null,
+            sample_count: group.sample_counts.length > 0 ? Math.round(group.sample_counts.reduce((a, b) => a + b, 0) / group.sample_counts.length) : null,
+            aggregated_count: group.timestamps.length
+          };
+        }).sort((a, b) => new Date(a.ts) - new Date(b.ts));
+      }
+
       function renderTable(data) {
         if (!data || data.length === 0) {
           dataTableContainer.classList.add('hidden');
@@ -667,8 +805,14 @@
       }
 
       function renderChart(trendData) {
-        const labels = trendData.data.map(d => d.ts);
+        let data = trendData.data;
         const range = trendData.meta.range;
+        const mode = trendData.meta.mode || 'raw';
+
+        // 如果是聚合模式，进行客户端聚合（作为后备）
+        if (mode === 'aggregated' && !trendData.meta.aggregated) {
+          data = aggregateData(data, range);
+        }
 
         // 根据模式选择数据集
         let datasets = [];
@@ -677,14 +821,14 @@
         if (currentChartMode === 'price') {
           datasets = [
             {
-              label: '加权底价 (Platinum)',
-              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.bottom_price })),
+              label: mode === 'aggregated' ? '区间加权底价 (Platinum)' : '加权底价 (Platinum)',
+              data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.bottom_price })),
               borderColor: '#6366f1',
               borderWidth: 3,
               backgroundColor: 'rgba(99, 102, 241, 0.05)',
               fill: true,
               tension: 0.4,
-              pointRadius: 3, // 增加圆点半径，确保单点可见
+              pointRadius: mode === 'aggregated' ? 4 : 3,
               pointHoverRadius: 6,
               pointHoverBackgroundColor: '#6366f1',
               pointHoverBorderColor: '#fff',
@@ -692,7 +836,7 @@
             },
             {
               label: '绝对最小价',
-              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.min_price })),
+              data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.min_price })),
               borderColor: isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.6)',
               borderWidth: 1.5,
               borderDash: [5, 5],
@@ -704,14 +848,14 @@
         } else {
           datasets = [
             {
-              label: '游戏中卖家数',
-              data: trendData.data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.active_count ?? d.sample_count ?? 0 })),
+              label: mode === 'aggregated' ? '区间平均卖家数' : '游戏中卖家数',
+              data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.active_count ?? d.sample_count ?? 0 })),
               borderColor: '#10b981',
               borderWidth: 3,
               backgroundColor: 'rgba(16, 185, 129, 0.05)',
               fill: true,
               tension: 0.4,
-              pointRadius: 3,
+              pointRadius: mode === 'aggregated' ? 4 : 3,
               pointHoverRadius: 6,
               pointHoverBackgroundColor: '#10b981',
               pointHoverBorderColor: '#fff',
@@ -733,10 +877,9 @@
         let minDate;
         const rangeMap = {
           '24h': { hours: 24 },
-          '48h': { hours: 48 },
-          '7d': { days: 7 },
-          '30d': { days: 30 },
-          '90d': { days: 90 }
+          '1h': { hours: 24 },   // 聚合模式下显示24小时的数据
+          '4h': { days: 7 },     // 4小时聚合显示7天
+          '1d': { days: 30 }     // 1天聚合显示30天
         };
         minDate = now.minus(rangeMap[range] || { days: 30 });
 
@@ -755,10 +898,11 @@
             scales: {
               x: {
                 type: 'time',
-                min: minDate.toISO(),
-                max: now.toISO(),
-                time: { 
-                  unit: (range === '24h' || range === '48h') ? 'hour' : (range === '7d' ? 'day' : 'week'),
+                ...(mode === 'raw' ? {} : { min: minDate.toISO(), max: now.toISO() }),
+                time: {
+                  unit: mode === 'aggregated' ?
+                    (range === '1h' ? 'hour' : (range === '4h' ? 'day' : 'week')) :
+                    ((range === '24h' || range === '48h') ? 'hour' : (range === '7d' ? 'day' : 'week')),
                   displayFormats: {
                     hour: 'HH:mm',
                     day: 'MM-dd',
@@ -766,12 +910,14 @@
                   }
                 },
                 grid: { display: false },
-                ticks: { 
-                  color: textColor, 
+                ticks: {
+                  color: textColor,
                   font: { size: 10 },
                   maxRotation: 0,
                   autoSkip: true,
-                  maxTicksLimit: range === '24h' ? 8 : 6
+                  maxTicksLimit: mode === 'aggregated' ?
+                    (range === '1h' ? 12 : (range === '4h' ? 8 : 6)) :
+                    (range === '24h' ? 8 : 6)
                 }
               },
               y: {
@@ -790,6 +936,22 @@
               legend: {
                 display: false
               },
+              zoom: mode === 'raw' ? {
+                pan: {
+                  enabled: true,
+                  mode: 'x',
+                  threshold: 10
+                },
+                zoom: {
+                  wheel: {
+                    enabled: true
+                  },
+                  pinch: {
+                    enabled: true
+                  },
+                  mode: 'x'
+                }
+              } : false,
               tooltip: {
                 backgroundColor: isDark ? '#1e293b' : '#fff',
                 titleColor: isDark ? '#f1f5f9' : '#0f172a',
@@ -809,6 +971,13 @@
             }
           }
         });
+
+        // 为原数据模式设置初始缩放范围（最近24小时）
+        if (mode === 'raw') {
+          const now = luxon.DateTime.now();
+          const initialMin = now.minus({ hours: 24 });
+          chart.zoomScale('x', { min: initialMin.toISO(), max: now.toISO() });
+        }
       }
 
       // 热门武器弹窗
@@ -893,6 +1062,8 @@
         }
       });
 
+      updateDisplayModeUI();
+      updateRangeSelectOptions();
       renderRecent();
       initHealth();
       initHotWeapons();

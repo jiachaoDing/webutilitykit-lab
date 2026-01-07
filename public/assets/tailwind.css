@@ -1616,6 +1616,15 @@
       }
     }
   }
+  .dark\:hover\:bg-slate-700 {
+    @media (prefers-color-scheme: dark) {
+      &:hover {
+        @media (hover: hover) {
+          background-color: var(--color-slate-700);
+        }
+      }
+    }
+  }
   .dark\:hover\:bg-slate-800 {
     @media (prefers-color-scheme: dark) {
       &:hover {

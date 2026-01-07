@@ -29,23 +29,24 @@ rivenTrackerApp.get("/bottom-trend", async (c) => {
   const weapon = c.req.query("weapon");
   const range = c.req.query("range") || "30d";
   const platform = c.req.query("platform") || "pc";
+  const mode = c.req.query("mode") || "raw";
   if (!weapon) return c.json({ error: "weapon is required" }, 400);
 
   const { TrackedRepo } = await import("../repos/TrackedRepo");
   const trendService = new TrendService(
-    new TickRepo(c.env.DB), 
+    new TickRepo(c.env.DB),
     new WeaponRepo(c.env.DB),
     new TrackedRepo(c.env.DB)
   );
-  
+
   // 获取武器的缓存时间（基于 tier）
   const cacheTTL = await trendService.getCacheTTL(weapon);
-  
+
   // 设置缓存头
   c.header('Cache-Control', `public, max-age=${cacheTTL}, s-maxage=${cacheTTL}`);
   c.header('CDN-Cache-Control', `max-age=${cacheTTL}`);
-  
-  return c.json(await trendService.getTrend(weapon, range, platform));
+
+  return c.json(await trendService.getTrend(weapon, range, platform, mode));
 });
 
 /**

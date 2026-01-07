@@ -45,6 +45,18 @@ export interface Tick {
   error_code?: string;
 }
 
+export interface AggregatedTick {
+  ts: string;
+  bottom_price: number | null;
+  sample_count: number | null;
+  active_count: number | null;
+  min_price: number | null;
+  p5_price: number | null;
+  p10_price: number | null;
+  status: string | null;
+  aggregated_count: number;
+}
+
 export interface SyncState {
   key: string;
   value: string;
