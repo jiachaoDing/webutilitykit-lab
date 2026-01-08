@@ -71,14 +71,21 @@ export class TierUpdateService {
         .map(s => s.weapon_slug)
     );
 
-    // 5. 批量更新 tier
+    // 5. 批量更新 tier (仅更新发生变化的武器以减少数据库压力)
     const updates: { slug: string; tier: 'hot' | 'cold' }[] = [];
     for (const weapon of allTracked) {
-      const tier = hotWeapons.has(weapon.slug) ? 'hot' : 'cold';
-      updates.push({ slug: weapon.slug, tier });
+      const newTier = hotWeapons.has(weapon.slug) ? 'hot' : 'cold';
+      if (weapon.tier !== newTier) {
+        updates.push({ slug: weapon.slug, tier: newTier });
+      }
     }
 
-    await this.trackedRepo.batchUpdateTiers(updates);
+    if (updates.length > 0) {
+      console.log(`[TierUpdate] Applying ${updates.length} tier changes...`);
+      await this.trackedRepo.batchUpdateTiers(updates);
+    } else {
+      console.log(`[TierUpdate] No tier changes needed.`);
+    }
 
     // 6. 返回更新结果
     const result: TierUpdateResult = {

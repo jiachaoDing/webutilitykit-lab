@@ -78,95 +78,99 @@ export class SamplingService {
       stopped_by_deadline: false,
     };
 
-    // 构建采样计划：5 把热门 + 1 把冷门（交替采样）
-    const plan: { slug: string; tier: 'hot' | 'cold' }[] = [];
+    try {
+      // 构建采样计划：5 把热门 + 1 把冷门（交替采样）
+      const plan: { slug: string; tier: 'hot' | 'cold' }[] = [];
 
-    // 先添加热门武器
-    if (totalHot > 0) {
-      for (let i = 0; i < hotBatchSize; i++) {
-        const idx = (normalizedCursorHot + i) % totalHot;
-        plan.push({ slug: hotList[idx].slug, tier: 'hot' });
-      }
-    }
-
-    // 再添加冷门武器
-    if (totalCold > 0) {
-      for (let i = 0; i < coldBatchSize; i++) {
-        const idx = (normalizedCursorCold + i) % totalCold;
-        plan.push({ slug: coldList[idx].slug, tier: 'cold' });
-      }
-    }
-
-    if (plan.length === 0) return result;
-
-    // 依次处理采样计划
-    for (const item of plan) {
-      if (Date.now() > deadline) {
-        result.stopped_by_deadline = true;
-        break;
+      // 先添加热门武器
+      if (totalHot > 0) {
+        for (let i = 0; i < hotBatchSize; i++) {
+          const idx = (normalizedCursorHot + i) % totalHot;
+          plan.push({ slug: hotList[idx].slug, tier: 'hot' });
+        }
       }
 
-      try {
-        const auctions = await this.fetchAuctionsWithTimeoutRetry(item.slug, deadline);
-        const calcResult = BottomPriceCalculator.calculate(auctions);
+      // 再添加冷门武器
+      if (totalCold > 0) {
+        for (let i = 0; i < coldBatchSize; i++) {
+          const idx = (normalizedCursorCold + i) % totalCold;
+          plan.push({ slug: coldList[idx].slug, tier: 'cold' });
+        }
+      }
 
-        const tick: Tick = {
-          ts: windowTs,
-          platform: 'pc',
-          weapon_slug: item.slug,
-          bottom_price: calcResult.bottom_price,
-          sample_count: calcResult.sample_count,
-          active_count: calcResult.active_count,
-          min_price: calcResult.min_price,
-          p5_price: calcResult.p5_price,
-          p10_price: calcResult.p10_price,
-          created_at: new Date().toISOString(),
-          source_status: calcResult.status
-        };
+      if (plan.length === 0) return result;
 
-        await this.tickRepo.upsertTick(tick);
+      // 依次处理采样计划
+      for (const item of plan) {
+        if (Date.now() > deadline) {
+          result.stopped_by_deadline = true;
+          break;
+        }
 
-        if (calcResult.status === 'ok') result.ok++;
-        else result.no_data++;
-
-        if (item.tier === 'hot') result.processed_hot++;
-        else result.processed_cold++;
-
-      } catch (e: any) {
-        result.error++;
-        result.errors.push({ weapon: item.slug, error: e.message });
-
-        if (item.tier === 'hot') result.processed_hot++;
-        else result.processed_cold++;
-
-        // 记录错误 Tick
         try {
-          await this.tickRepo.upsertTick({
+          const auctions = await this.fetchAuctionsWithTimeoutRetry(item.slug, deadline);
+          const calcResult = BottomPriceCalculator.calculate(auctions);
+
+          const tick: Tick = {
             ts: windowTs,
             platform: 'pc',
             weapon_slug: item.slug,
-            bottom_price: null,
-            sample_count: 0,
-            active_count: 0,
-            min_price: null,
-            p5_price: null,
-            p10_price: null,
+            bottom_price: calcResult.bottom_price,
+            sample_count: calcResult.sample_count,
+            active_count: calcResult.active_count,
+            min_price: calcResult.min_price,
+            p5_price: calcResult.p5_price,
+            p10_price: calcResult.p10_price,
             created_at: new Date().toISOString(),
-            source_status: 'error',
-            error_code:
-              e.message === 'WFM_LIMIT_REACHED' ? 'HTTP_429'
-              : e.message === 'WFM_TIMEOUT' ? 'TIMEOUT'
-              : 'UNKNOWN'
-          });
-        } catch (writeErr: any) {
-          result.errors.push({ weapon: item.slug, error: `tick_write_failed:${writeErr?.message || String(writeErr)}` });
+            source_status: calcResult.status
+          };
+
+          await this.tickRepo.upsertTick(tick);
+
+          if (calcResult.status === 'ok') result.ok++;
+          else result.no_data++;
+
+          if (item.tier === 'hot') result.processed_hot++;
+          else result.processed_cold++;
+
+        } catch (e: any) {
+          result.error++;
+          result.errors.push({ weapon: item.slug, error: e.message });
+
+          if (item.tier === 'hot') result.processed_hot++;
+          else result.processed_cold++;
+
+          // 记录错误 Tick
+          try {
+            await this.tickRepo.upsertTick({
+              ts: windowTs,
+              platform: 'pc',
+              weapon_slug: item.slug,
+              bottom_price: null,
+              sample_count: 0,
+              active_count: 0,
+              min_price: null,
+              p5_price: null,
+              p10_price: null,
+              created_at: new Date().toISOString(),
+              source_status: 'error',
+              error_code:
+                e.message === 'WFM_LIMIT_REACHED' ? 'HTTP_429'
+                : e.message === 'WFM_TIMEOUT' ? 'TIMEOUT'
+                : 'UNKNOWN'
+            });
+          } catch (writeErr: any) {
+            result.errors.push({ weapon: item.slug, error: `tick_write_failed:${writeErr?.message || String(writeErr)}` });
+          }
         }
       }
+    } catch (topLevelError: any) {
+      result.errors.push({ weapon: "SYSTEM", error: `fatal_error:${topLevelError.message}` });
+    } finally {
+      // 无论如何都要更新游标位置，确保任务不原地踏步
+      result.cursor_hot_after = (normalizedCursorHot + result.processed_hot) % Math.max(1, totalHot);
+      result.cursor_cold_after = (normalizedCursorCold + result.processed_cold) % Math.max(1, totalCold);
     }
-
-    // 更新游标位置
-    result.cursor_hot_after = (normalizedCursorHot + result.processed_hot) % Math.max(1, totalHot);
-    result.cursor_cold_after = (normalizedCursorCold + result.processed_cold) % Math.max(1, totalCold);
 
     return result;
   }

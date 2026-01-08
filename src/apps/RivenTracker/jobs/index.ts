@@ -32,7 +32,12 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
     });
 
     try {
-      const result = await syncService.syncRivens();
+      // 设置 25 秒总超时，防止任务长时间挂起
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('SYNC_JOB_TIMEOUT')), 25000)
+      );
+
+      const result = await Promise.race([syncService.syncRivens(), timeoutPromise]) as any;
       await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(result));
       
       // 字典同步成功后，更新武器分层（基于最近 7 天的价格统计）
@@ -48,15 +53,20 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
       });
       
       try {
-        const tierResult = await tierUpdateService.updateTiers(7, 50);
+        const tierTimeoutPromise = new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('TIER_UPDATE_TIMEOUT')), 25000)
+        );
+        const tierResult = await Promise.race([tierUpdateService.updateTiers(7, 50), tierTimeoutPromise]) as any;
         await jobRepo.update(tierJobId, 'success', new Date().toISOString(), JSON.stringify(tierResult));
         console.log(`[TierUpdate] Success: ${tierResult.hot_count} hot, ${tierResult.cold_count} cold`);
       } catch (tierError: any) {
         console.error(`[TierUpdate] Failed: ${tierError?.message || String(tierError)}`);
-        await jobRepo.update(tierJobId, 'fail', new Date().toISOString(), JSON.stringify({ error: tierError?.message || String(tierError) }));
+        const status = tierError?.message === 'TIER_UPDATE_TIMEOUT' ? 'timeout' : 'fail';
+        await jobRepo.update(tierJobId, status, new Date().toISOString(), JSON.stringify({ error: tierError?.message || String(tierError) }));
       }
     } catch (e: any) {
-      await jobRepo.update(jobId, 'fail', new Date().toISOString(), JSON.stringify({ error: e.message }));
+      const status = e?.message === 'SYNC_JOB_TIMEOUT' ? 'timeout' : 'fail';
+      await jobRepo.update(jobId, status, new Date().toISOString(), JSON.stringify({ error: e.message }));
     } finally {
       // 额外维护任务：保留 job_run 最近 7 天
       try {
@@ -116,16 +126,24 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
   });
 
   try {
-    const stats = await samplingService.runTieredBatch(
-      cursorHot, 
-      cursorCold, 
-      hotBatchSize, 
-      coldBatchSize, 
-      windowTs, 
-      { timeBudgetMs: 20000 }
+    // 设置 25 秒总超时，防止任务长时间挂起
+    const timeoutPromise = new Promise((_, reject) => 
+      setTimeout(() => reject(new Error('SAMPLING_TIMEOUT')), 25000)
     );
+
+    const stats = await Promise.race([
+      samplingService.runTieredBatch(
+        cursorHot, 
+        cursorCold, 
+        hotBatchSize, 
+        coldBatchSize, 
+        windowTs, 
+        { timeBudgetMs: 20000 }
+      ),
+      timeoutPromise
+    ]) as any;
     
-    await cursorRepo.setTiered(stats.cursor_hot_after, stats.cursor_cold_after);
+    await cursorRepo.setTiered(stats.cursor_after ?? stats.cursor_hot_after, stats.cursor_cold_after);
     
     // 精简摘要，避免 detail 字段过大
     const summary = {
@@ -134,8 +152,10 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
         hot: { total: stats.total_hot, processed: stats.processed_hot },
         cold: { total: stats.total_cold, processed: stats.processed_cold }
       },
-      cursor_hot: { before: stats.cursor_hot_before, after: stats.cursor_hot_after },
-      cursor_cold: { before: stats.cursor_cold_before, after: stats.cursor_cold_after },
+      cursor: {
+        hot: { before: stats.cursor_hot_before, after: stats.cursor_hot_after },
+        cold: { before: stats.cursor_cold_before, after: stats.cursor_cold_after }
+      },
       ok: stats.ok,
       no_data: stats.no_data,
       error: stats.error,
@@ -143,17 +163,14 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
       errors_sample: Array.isArray(stats.errors) ? stats.errors.slice(0, 5) : [],
     };
     
-    try {
-      await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(summary));
-    } catch (e: any) {
-      console.error(`[JobRun] update(success) failed: ${e?.message || String(e)}`);
-    }
+    await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(summary));
   } catch (e: any) {
-    try {
-      await jobRepo.update(jobId, 'fail', new Date().toISOString(), JSON.stringify({ error: e?.message || String(e) }));
-    } catch (e2: any) {
-      console.error(`[JobRun] update(fail) failed: ${e2?.message || String(e2)}`);
-    }
+    console.error(`[Sampling] Failed: ${e?.message || String(e)}`);
+    const status = e?.message === 'SAMPLING_TIMEOUT' ? 'timeout' : 'fail';
+    await jobRepo.update(jobId, status, new Date().toISOString(), JSON.stringify({ 
+      error: e?.message || String(e),
+      cursor_at_fail: { cursorHot, cursorCold }
+    }));
   }
 }
 
