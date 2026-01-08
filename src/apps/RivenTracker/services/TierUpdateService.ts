@@ -20,7 +20,7 @@ export interface TierUpdateResult {
  * 武器分层更新服务
  * 
  * 功能：根据最近 N 天的价格数据，计算每个武器的平均底价，
- * 将排名前 50 的武器标记为 'hot'（热门），其余标记为 'cold'（冷门）。
+ * 将卖家数 >= 10且价格前 50 的武器标记为 'hot'（热门），其余标记为 'cold'（冷门）。
  * 
  * 调用时机：每天 UTC 03:00 在字典同步任务后自动执行
  */
@@ -63,8 +63,13 @@ export class TierUpdateService {
     // 3. 按平均价格降序排序
     priceStats.sort((a, b) => b.avg_bottom_price - a.avg_bottom_price);
 
-    // 4. 确定分层：前 hotThreshold 名为 'hot'，其余为 'cold'
-    const hotWeapons = new Set(priceStats.slice(0, hotThreshold).map(s => s.weapon_slug));
+    // 4. 确定分层：前 hotThreshold 名为 'hot'，且平均价格 > 0，其余为 'cold'
+    const hotWeapons = new Set(
+      priceStats
+        .filter(s => s.avg_bottom_price > 0)
+        .slice(0, hotThreshold)
+        .map(s => s.weapon_slug)
+    );
 
     // 5. 批量更新 tier
     const updates: { slug: string; tier: 'hot' | 'cold' }[] = [];
@@ -117,6 +122,7 @@ export class TierUpdateService {
             AND ts >= ?
             AND source_status = 'ok'
             AND bottom_price IS NOT NULL
+            AND active_count >= 10
             AND weapon_slug IN (${placeholders})
           GROUP BY weapon_slug
         `).bind(startTs, ...batch).all<{

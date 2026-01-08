@@ -471,6 +471,9 @@
   .animate-pulse {
     animation: var(--animate-pulse);
   }
+  .cursor-not-allowed {
+    cursor: not-allowed;
+  }
   .cursor-pointer {
     cursor: pointer;
   }
@@ -1512,6 +1515,11 @@
       @supports (color: color-mix(in lab, red, red)) {
         background-color: color-mix(in oklab, var(--color-black) 20%, transparent);
       }
+    }
+  }
+  .dark\:bg-slate-700 {
+    @media (prefers-color-scheme: dark) {
+      background-color: var(--color-slate-700);
     }
   }
   .dark\:bg-slate-800 {

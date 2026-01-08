@@ -91,6 +91,7 @@ export class TickRepo {
           FROM riven_bottom_tick
           WHERE source_status = 'ok' 
             AND ts >= datetime('now', '-24 hours')
+            AND active_count >= 10
         ) t
         JOIN riven_weapon_dict w ON t.weapon_slug = w.slug
         WHERE t.rn = 1
