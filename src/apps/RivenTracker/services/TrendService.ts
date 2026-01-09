@@ -9,7 +9,8 @@ export class TrendService {
     private weaponRepo: WeaponRepo,
     private trackedRepo?: TrackedRepo,
     private kv?: KVNamespace,
-    private coordinator?: DurableObjectNamespace
+    private coordinator?: DurableObjectNamespace,
+    private ctx?: { waitUntil: (p: Promise<any>) => void }
   ) {}
 
   /**
@@ -25,8 +26,8 @@ export class TrendService {
         const resp = await stub.fetch(`http://do/recent-history?slug=${weaponSlug}`);
         if (resp.ok) {
           const history = (await resp.json()) as Tick[];
-          if (history.length > 0) {
-            // 如果是聚合模式，直接对内存中的原始数据进行聚合计算
+          // 优化逻辑：如果数据点太少（少于 10 个），不使用 DO 缓存，回退到 D1/KV 以获取更完整的历史
+          if (history.length >= 10 || (mode === 'raw' && history.length > 0)) {
             const isAggregated = mode === 'aggregated';
             const displayData = isAggregated ? this.aggregateTicks(history, range) : history;
 
@@ -134,13 +135,15 @@ export class TrendService {
       }))
     };
 
-    // 3. 异步存入 KV 缓存 (针对长周期或聚合请求，延长至 4 小时以节省额度)
+    // 3. 异步存入 KV 缓存
     if (this.kv) {
       const kv = this.kv;
-      // 1h Raw 模式若漏到 D1 查询，给 5 分钟缓存；
-      // 其余长周期或聚合查询，一律给 4 小时 (14400s)
-      const ttl = (range === '1h' && mode === 'raw') ? 300 : 14400;
-      kv.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl }).catch(() => {});
+      const ttl = (range === '1h' && mode === 'raw') ? 600 : 14400;
+      const promise = kv.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl }).catch(() => {});
+      
+      if (this.ctx) {
+        this.ctx.waitUntil(promise);
+      }
     }
 
     return result;

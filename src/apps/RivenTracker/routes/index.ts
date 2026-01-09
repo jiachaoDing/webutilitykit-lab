@@ -23,7 +23,8 @@ rivenTrackerApp.get("/weapons", async (c) => {
     new WeaponRepo(c.env.DB),
     undefined,
     c.env.KV,
-    c.env.RIVEN_COORDINATOR
+    c.env.RIVEN_COORDINATOR,
+    c.executionCtx
   );
   
   // 武器字典缓存 1 小时
@@ -74,7 +75,8 @@ rivenTrackerApp.get("/bottom-now", async (c) => {
     new WeaponRepo(c.env.DB),
     undefined,
     c.env.KV,
-    c.env.RIVEN_COORDINATOR
+    c.env.RIVEN_COORDINATOR,
+    c.executionCtx
   );
   
   // 快照对实时性要求较高，缓存 1 分钟
@@ -96,7 +98,8 @@ rivenTrackerApp.get("/hot-weapons", async (c) => {
     new WeaponRepo(c.env.DB),
     undefined,
     c.env.KV,
-    c.env.RIVEN_COORDINATOR
+    c.env.RIVEN_COORDINATOR,
+    c.executionCtx
   );
   
   // 热门榜单缓存 3 分钟
