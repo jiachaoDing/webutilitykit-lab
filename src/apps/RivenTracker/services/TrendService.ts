@@ -138,7 +138,15 @@ export class TrendService {
     // 3. 异步存入 KV 缓存
     if (this.kv) {
       const kv = this.kv;
-      const ttl = (range === '1h' && mode === 'raw') ? 600 : 14400;
+      // 策略：
+      // 1. 1h range + raw mode: 10 分钟 (600s)，保证原始数据相对新鲜
+      // 2. 1h range + aggregated mode: 1 小时 (3600s)，匹配聚合步长
+      // 3. 其他长周期 (7天/30天): 4 小时 (14400s)
+      let ttl = 14400;
+      if (range === '1h') {
+        ttl = mode === 'raw' ? 600 : 3600;
+      }
+      
       const promise = kv.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl }).catch(() => {});
       
       if (this.ctx) {
