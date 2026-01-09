@@ -9,15 +9,14 @@ assets = { directory = "./public", binding = "ASSETS" }
 APP_NAME = "webutilitykit-lab"
 APP_VERSION = "0.1.0"
 #
-# 分层爬取配置（每分钟执行一次）：
-# - 奇数分钟：爬 3 把热门武器
-# - 偶数分钟：爬 2 把热门 + 1 把冷门武器
-# - 热门武器（50把）：20 分钟完成一轮
-# - 冷门武器（364把）：约 12 小时完成一轮
-# - API 调用频率：3 把/分钟（与原配置一致）
-HOT_BATCH_SIZE_ODD = "3"   # 奇数分钟：热门武器数量
-HOT_BATCH_SIZE_EVEN = "2"  # 偶数分钟：热门武器数量
-COLD_BATCH_SIZE = "1"      # 偶数分钟：冷门武器数量
+# - 采样频率：每分钟一次，每次爬取 5 把武器（5 把/分钟）
+# - 采样组合：奇数分钟 5 Hot / 偶数分钟 5 Cold
+# - 存储架构：状态与名单存 KV，价格数据暂存 KV 缓冲区，每 10 分钟批量同步至 D1
+# - 时间对齐：1 分钟（确保高分辨率趋势图）
+# - 游标备份：每分钟更新 KV 进度，每小时同步备份一次到 D1
+HOT_BATCH_SIZE_ODD = "5"   # 奇数分钟：热门武器数量
+HOT_BATCH_SIZE_EVEN = "0"  # 偶数分钟：热门武器数量
+COLD_BATCH_SIZE = "5"      # 偶数分钟：冷门武器数量
 
 [[d1_databases]]
 binding = "DB"
@@ -30,9 +29,24 @@ crons = ["* * * * *", "0 3 * * *"]
 [[routes]]
 pattern = "lab.webutilitykit.com"
 custom_domain = true
+
+[[kv_namespaces]]
+binding = "KV"
+id = "4044f8ce15584d4cbdb6c3117eb458c3"
+
+[durable_objects]
+bindings = [
+  { name = "RIVEN_COORDINATOR", class_name = "RivenCoordinatorDO" }
+]
+
+[[migrations]]
+tag = "v1-riven-do"
+new_classes = ["RivenCoordinatorDO"]
+
+
 [observability]
 [observability.logs]
-enabled = false
+enabled = true
 head_sampling_rate = 1
 invocation_logs = true
 persist = true

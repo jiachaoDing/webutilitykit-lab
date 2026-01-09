@@ -4,12 +4,18 @@ import { logger } from "hono/logger";
 import { timing } from "hono/timing";
 import rivenTrackerApp from "./apps/RivenTracker/routes";
 import { handleScheduled } from "./apps/RivenTracker/jobs";
+import { RivenCoordinatorDO } from "./apps/RivenTracker/RivenCoordinatorDO";
 
 interface Env {
   ASSETS: Fetcher;
   DB: D1Database;
+  KV: KVNamespace;
+  RIVEN_COORDINATOR: DurableObjectNamespace;
   APP_NAME: string;
   APP_VERSION: string;
+  HOT_BATCH_SIZE_ODD: string;
+  HOT_BATCH_SIZE_EVEN: string;
+  COLD_BATCH_SIZE: string;
 }
 
 const api = new Hono<{ Bindings: Env }>();
@@ -73,3 +79,5 @@ export default {
     ctx.waitUntil(handleScheduled(event, env, ctx));
   },
 };
+
+export { RivenCoordinatorDO };

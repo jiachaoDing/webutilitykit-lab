@@ -7,7 +7,6 @@ import { TickRepo } from "../repos/TickRepo";
 import { TrackedRepo } from "../repos/TrackedRepo";
 import { WeaponRepo } from "../repos/WeaponRepo";
 import { SyncStateRepo } from "../repos/SyncStateRepo";
-import { SamplingCursorRepo } from "../repos/SamplingCursorRepo";
 import { JobRunRepo } from "../repos/JobRunRepo";
 import { Sharding } from "../domain/Sharding";
 
@@ -18,7 +17,8 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
   // 1. 字典同步任务 (例如每天 UTC 03:00)
   if (event.cron === "0 3 * * *") {
     const syncService = new SyncService(new WfmV2Client(), new SyncStateRepo(db), new WeaponRepo(db));
-    const tierUpdateService = new TierUpdateService(db, new TrackedRepo(db));
+    const trackedRepo = new TrackedRepo(db);
+    const tierUpdateService = new TierUpdateService(db, trackedRepo);
     const jobRepo = new JobRunRepo(db);
     const jobId = crypto.randomUUID();
     
@@ -59,6 +59,12 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
         const tierResult = await Promise.race([tierUpdateService.updateTiers(7, 50), tierTimeoutPromise]) as any;
         await jobRepo.update(tierJobId, 'success', new Date().toISOString(), JSON.stringify(tierResult));
         console.log(`[TierUpdate] Success: ${tierResult.hot_count} hot, ${tierResult.cold_count} cold`);
+
+        // 刷新 DO 的名单缓存
+        console.log('[TierUpdate] Notifying DO to refresh lists...');
+        const doId = env.RIVEN_COORDINATOR.idFromName("global");
+        const coordinator = env.RIVEN_COORDINATOR.get(doId);
+        await coordinator.fetch("http://do/refresh-lists", { method: "POST" });
       } catch (tierError: any) {
         console.error(`[TierUpdate] Failed: ${tierError?.message || String(tierError)}`);
         const status = tierError?.message === 'TIER_UPDATE_TIMEOUT' ? 'timeout' : 'fail';
@@ -68,11 +74,11 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
       const status = e?.message === 'SYNC_JOB_TIMEOUT' ? 'timeout' : 'fail';
       await jobRepo.update(jobId, status, new Date().toISOString(), JSON.stringify({ error: e.message }));
     } finally {
-      // 额外维护任务：保留 job_run 最近 7 天
+      // 额外维护任务：保留 job_run 最近 2 天
       try {
-        const cutoff = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+        const cutoff = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
         const deleted = await jobRepo.purgeOlderThan(cutoff);
-        console.log(`[JobRun] purged older than 7d (${cutoff}), deleted=${deleted}`);
+        console.log(`[JobRun] purged older than 2d (${cutoff}), deleted=${deleted}`);
       } catch (e: any) {
         console.error(`[JobRun] purge failed: ${e?.message || String(e)}`);
       }
@@ -80,26 +86,12 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
     return;
   }
 
-  // 2. 价格采样游标任务（每分钟触发一次；分层采样：奇偶分钟交替）
+  // 2. 价格采样任务（新架构：Cron + Durable Object）
   const windowTs = Sharding.getWindowTs(now);
-
-  const samplingService = new SamplingService(new WfmV1Client(), new TickRepo(db), new TrackedRepo(db));
-  const cursorRepo = new SamplingCursorRepo(db);
-  const jobRepo = new JobRunRepo(db);
-  const jobId = crypto.randomUUID();
-
-  // 获取分层游标（如果不存在则初始化为 0）
-  const prev = await cursorRepo.getTiered();
-  const cursorHot = prev?.cursorHot ?? 0;
-  const cursorCold = prev?.cursorCold ?? 0;
-
-  // 分层采样配置（奇偶分钟交替）：
-  // - 奇数分钟：爬 3 把热门武器
-  // - 偶数分钟：爬 2 把热门 + 1 把冷门武器
-  // - 每分钟总计爬 3 把武器（与原配置一致）
   const currentMinute = now.getMinutes();
   const isEvenMinute = currentMinute % 2 === 0;
-  
+
+  // 分层采样配置
   const hotBatchSize = isEvenMinute 
     ? Math.max(1, parseInt(env.HOT_BATCH_SIZE_EVEN || "2"))
     : Math.max(1, parseInt(env.HOT_BATCH_SIZE_ODD || "3"));
@@ -108,69 +100,56 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
     ? Math.max(0, parseInt(env.COLD_BATCH_SIZE || "1"))
     : 0;
 
-  await jobRepo.create({
-    id: jobId,
-    job_name: `sample_tiered`,
-    scheduled_ts: windowTs,
-    started_at: now.toISOString(),
-    status: 'partial',
-    detail: JSON.stringify({ 
-      windowTs,
-      minute: currentMinute,
-      cycle: isEvenMinute ? 'even' : 'odd',
-      cursorHot, 
-      cursorCold, 
-      hotBatchSize, 
-      coldBatchSize 
-    })
-  });
+  const doId = env.RIVEN_COORDINATOR.idFromName("global");
+  const coordinator = env.RIVEN_COORDINATOR.get(doId);
 
   try {
-    // 设置 25 秒总超时，防止任务长时间挂起
-    const timeoutPromise = new Promise((_, reject) => 
-      setTimeout(() => reject(new Error('SAMPLING_TIMEOUT')), 25000)
+    // A. 问 DO 要本轮要采样的 slugs (内部维护游标)
+    const nextBatchResp = await coordinator.fetch(
+      `http://do/next-batch?hotBatchSize=${hotBatchSize}&coldBatchSize=${coldBatchSize}`
     );
+    if (!nextBatchResp.ok) throw new Error(`DO fetch /next-batch failed: ${nextBatchResp.status}`);
+    const { slugs } = (await nextBatchResp.json()) as { slugs: string[] };
 
-    const stats = await Promise.race([
-      samplingService.runTieredBatch(
-        cursorHot, 
-        cursorCold, 
-        hotBatchSize, 
-        coldBatchSize, 
-        windowTs, 
-        { timeBudgetMs: 20000 }
-      ),
-      timeoutPromise
-    ]) as any;
-    
-    await cursorRepo.setTiered(stats.cursor_after ?? stats.cursor_hot_after, stats.cursor_cold_after);
-    
-    // 精简摘要，避免 detail 字段过大
-    const summary = {
-      windowTs,
-      tier_stats: {
-        hot: { total: stats.total_hot, processed: stats.processed_hot },
-        cold: { total: stats.total_cold, processed: stats.processed_cold }
-      },
-      cursor: {
-        hot: { before: stats.cursor_hot_before, after: stats.cursor_hot_after },
-        cold: { before: stats.cursor_cold_before, after: stats.cursor_cold_after }
-      },
-      ok: stats.ok,
-      no_data: stats.no_data,
-      error: stats.error,
-      stopped_by_deadline: stats.stopped_by_deadline,
-      errors_sample: Array.isArray(stats.errors) ? stats.errors.slice(0, 5) : [],
-    };
-    
-    await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(summary));
+    if (slugs.length === 0) {
+      console.log('[Sampling] No slugs to sample, list might be empty.');
+      return;
+    }
+
+    // B. 执行外部 API 采样
+    const samplingService = new SamplingService(new WfmV1Client(), new TickRepo(db), new TrackedRepo(db));
+    const { samples, stats } = await samplingService.runBatch(slugs, windowTs, { timeBudgetMs: 22000 });
+
+    // C. 将结果通过 DO 写入 D1 并更新内存快照
+    const appendResp = await coordinator.fetch("http://do/append-results", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ts: windowTs, samples })
+    });
+    if (!appendResp.ok) throw new Error(`DO fetch /append-results failed: ${appendResp.status}`);
+
+    // D. 定期（每 5 分钟）让 DO 同步合并后的快照到 KV
+    if (currentMinute % 5 === 0) {
+      ctx.waitUntil(coordinator.fetch("http://do/sync-snapshot", { method: "POST" }));
+    }
+
+    // E. 记录 Job 审计日志（可选，为了兼容性保留部分结构）
+    const jobRepo = new JobRunRepo(db);
+    const isHourly = currentMinute === 0;
+    if (isHourly || stats.error > 0) {
+      await jobRepo.create({
+        id: crypto.randomUUID(),
+        job_name: 'sample_tick',
+        scheduled_ts: windowTs,
+        started_at: now.toISOString(),
+        finished_at: new Date().toISOString(),
+        status: stats.error > 0 ? 'partial' : 'success',
+        detail: JSON.stringify({ slugs, stats, windowTs })
+      });
+    }
+
   } catch (e: any) {
-    console.error(`[Sampling] Failed: ${e?.message || String(e)}`);
-    const status = e?.message === 'SAMPLING_TIMEOUT' ? 'timeout' : 'fail';
-    await jobRepo.update(jobId, status, new Date().toISOString(), JSON.stringify({ 
-      error: e?.message || String(e),
-      cursor_at_fail: { cursorHot, cursorCold }
-    }));
+    console.error(`[Sampling] Job failed: ${e?.message || String(e)}`);
   }
 }
 

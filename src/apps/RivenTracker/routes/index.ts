@@ -3,7 +3,13 @@ import { TickRepo } from "../repos/TickRepo";
 import { WeaponRepo } from "../repos/WeaponRepo";
 import { TrendService } from "../services/TrendService";
 
-const rivenTrackerApp = new Hono<{ Bindings: { DB: D1Database } }>();
+const rivenTrackerApp = new Hono<{ 
+  Bindings: { 
+    DB: D1Database; 
+    KV: KVNamespace; 
+    RIVEN_COORDINATOR: DurableObjectNamespace 
+  } 
+}>();
 
 /**
  * 武器搜索接口
@@ -12,7 +18,13 @@ const rivenTrackerApp = new Hono<{ Bindings: { DB: D1Database } }>();
 rivenTrackerApp.get("/weapons", async (c) => {
   const q = c.req.query("q") || "";
   const limit = parseInt(c.req.query("limit") || "20");
-  const trendService = new TrendService(new TickRepo(c.env.DB), new WeaponRepo(c.env.DB));
+  const trendService = new TrendService(
+    new TickRepo(c.env.DB), 
+    new WeaponRepo(c.env.DB),
+    undefined,
+    c.env.KV,
+    c.env.RIVEN_COORDINATOR
+  );
   
   // 武器字典缓存 1 小时
   c.header('Cache-Control', 'public, max-age=3600, s-maxage=3600');
@@ -23,7 +35,7 @@ rivenTrackerApp.get("/weapons", async (c) => {
 
 /**
  * 获取底价趋势接口
- * 缓存策略：热门武器 5 分钟，冷门武器 2 小时
+ * 浏览器/CDN 缓存：5 分钟
  */
 rivenTrackerApp.get("/bottom-trend", async (c) => {
   const weapon = c.req.query("weapon");
@@ -32,17 +44,16 @@ rivenTrackerApp.get("/bottom-trend", async (c) => {
   const mode = c.req.query("mode") || "raw";
   if (!weapon) return c.json({ error: "weapon is required" }, 400);
 
-  const { TrackedRepo } = await import("../repos/TrackedRepo");
   const trendService = new TrendService(
     new TickRepo(c.env.DB),
     new WeaponRepo(c.env.DB),
-    new TrackedRepo(c.env.DB)
+    undefined,
+    c.env.KV,
+    c.env.RIVEN_COORDINATOR
   );
 
-  // 获取武器的缓存时间（基于 tier）
-  const cacheTTL = await trendService.getCacheTTL(weapon);
-
-  // 设置缓存头
+  // 统一设置 5 分钟的浏览器/CDN 缓存
+  const cacheTTL = 300;
   c.header('Cache-Control', `public, max-age=${cacheTTL}, s-maxage=${cacheTTL}`);
   c.header('CDN-Cache-Control', `max-age=${cacheTTL}`);
 
@@ -51,44 +62,48 @@ rivenTrackerApp.get("/bottom-trend", async (c) => {
 
 /**
  * 当前底价快照接口
- * 缓存策略：与趋势接口相同（热门 5 分钟，冷门 2 小时）
+ * 浏览器缓存：1 分钟
  */
 rivenTrackerApp.get("/bottom-now", async (c) => {
   const weapon = c.req.query("weapon");
   const platform = c.req.query("platform") || "pc";
   if (!weapon) return c.json({ error: "weapon is required" }, 400);
 
-  const { TrackedRepo } = await import("../repos/TrackedRepo");
   const trendService = new TrendService(
     new TickRepo(c.env.DB), 
     new WeaponRepo(c.env.DB),
-    new TrackedRepo(c.env.DB)
+    undefined,
+    c.env.KV,
+    c.env.RIVEN_COORDINATOR
   );
   
-  // 获取武器的缓存时间（基于 tier）
-  const cacheTTL = await trendService.getCacheTTL(weapon);
-  
-  // 设置缓存头
+  // 快照对实时性要求较高，缓存 1 分钟
+  const cacheTTL = 60;
   c.header('Cache-Control', `public, max-age=${cacheTTL}, s-maxage=${cacheTTL}`);
-  c.header('CDN-Cache-Control', `max-age=${cacheTTL}`);
   
   return c.json(await trendService.getLatest(weapon, platform));
 });
 
 /**
- * 获取热门/高价武器
+ * 获取最新热门/高价武器
  * 缓存策略：3 分钟（榜单变化较快）
  */
 rivenTrackerApp.get("/hot-weapons", async (c) => {
   const limit = parseInt(c.req.query("limit") || "10");
   const sortBy = (c.req.query("sortBy") as 'active_count' | 'price') || "price";
-  const trendService = new TrendService(new TickRepo(c.env.DB), new WeaponRepo(c.env.DB));
+  const trendService = new TrendService(
+    new TickRepo(c.env.DB), 
+    new WeaponRepo(c.env.DB),
+    undefined,
+    c.env.KV,
+    c.env.RIVEN_COORDINATOR
+  );
   
   // 热门榜单缓存 3 分钟
   c.header('Cache-Control', 'public, max-age=180, s-maxage=180');
   c.header('CDN-Cache-Control', 'max-age=180');
   
-  return c.json(await trendService.getHotWeapons(limit, sortBy));
+  return c.json(await trendService.getNewHotWeapons(limit, sortBy));
 });
 
 /**
@@ -113,7 +128,7 @@ rivenTrackerApp.get("/health", async (c) => {
     ok: true,
     last_tick_utc: lastTick,
     tracked_weapon_count: trackedCount,
-    notes: "tiered sampling: hot ~20min, cold ~12h"
+    notes: "DO-Coordinated sampling: 5/min, hot ~20min, cold ~2.4h. Cache: DO Memory + KV Bundle."
   });
 });
 
@@ -130,31 +145,71 @@ rivenTrackerApp.post("/debug/sync", async (c) => {
 });
 
 /**
- * 调试接口：手动触发采样 (仅建议开发环境下使用)
+ * 调试接口：手动触发采样 (新架构：通过 DO 协同)
  */
 rivenTrackerApp.post("/debug/sample", async (c) => {
   const { SamplingService } = await import("../services/SamplingService");
   const { WfmV1Client } = await import("../clients/WfmV1Client");
   const { Sharding } = await import("../domain/Sharding");
-  const { SamplingCursorRepo } = await import("../repos/SamplingCursorRepo");
-  const shard = parseInt(c.req.query("shard") || "0");
-  const batchSize = parseInt(c.req.query("batchSize") || "15");
+  const { TrackedRepo } = await import("../repos/TrackedRepo");
+  const { TickRepo } = await import("../repos/TickRepo");
+
+  const hotSize = parseInt(c.req.query("hotSize") || "3");
+  const coldSize = parseInt(c.req.query("coldSize") || "0");
   const windowTs = Sharding.getWindowTs(new Date());
+  
+  const doId = c.env.RIVEN_COORDINATOR.idFromName("global");
+  const coordinator = c.env.RIVEN_COORDINATOR.get(doId);
+
+  // 1. 从 DO 获取任务
+  const nextBatchResp = await coordinator.fetch(
+    `http://do/next-batch?hotBatchSize=${hotSize}&coldBatchSize=${coldSize}`
+  );
+  const { slugs } = (await nextBatchResp.json()) as { slugs: string[] };
+
+  if (slugs.length === 0) return c.json({ message: "No slugs to sample" });
+
+  // 2. 执行采样
   const samplingService = new SamplingService(
     new WfmV1Client(),
     new TickRepo(c.env.DB),
-    new (await import("../repos/TrackedRepo")).TrackedRepo(c.env.DB),
+    new TrackedRepo(c.env.DB)
   );
 
-  // 兼容旧参数：shard 视为"起始批次编号"，转换成 cursor 偏移
-  // 例如 shard=0 -> 从 0 开始；shard=1 -> 从 batchSize 开始。
-  const cursor = Math.max(0, shard) * Math.max(1, batchSize);
-  const stats = await samplingService.runBatch(cursor, batchSize, windowTs, { timeBudgetMs: 25000 });
+  const { samples, stats } = await samplingService.runBatch(slugs, windowTs, { timeBudgetMs: 25000 });
 
-  // 同步写入 cursor，方便后续 cron 接着跑（可选）
-  const cursorRepo = new SamplingCursorRepo(c.env.DB);
-  await cursorRepo.set(stats.cursor_after);
-  return c.json(stats);
+  // 3. 提交结果到 DO
+  const appendResp = await coordinator.fetch("http://do/append-results", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ts: windowTs, samples })
+  });
+  
+  return c.json({ 
+    stats, 
+    append: await appendResp.json(),
+    slugs 
+  });
+});
+
+/**
+ * 调试接口：手动刷新武器名单缓存
+ */
+rivenTrackerApp.post("/debug/refresh-list", async (c) => {
+  const doId = c.env.RIVEN_COORDINATOR.idFromName("global");
+  const coordinator = c.env.RIVEN_COORDINATOR.get(doId);
+  const resp = await coordinator.fetch("http://do/refresh-lists", { method: "POST" });
+  return c.json(await resp.json());
+});
+
+/**
+ * 调试接口：手动强制同步快照到 KV
+ */
+rivenTrackerApp.post("/debug/sync-snapshot", async (c) => {
+  const doId = c.env.RIVEN_COORDINATOR.idFromName("global");
+  const coordinator = c.env.RIVEN_COORDINATOR.get(doId);
+  const resp = await coordinator.fetch("http://do/sync-snapshot", { method: "POST" });
+  return c.json(await resp.json());
 });
 
 /**

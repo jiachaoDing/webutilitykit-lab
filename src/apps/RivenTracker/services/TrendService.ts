@@ -7,53 +7,121 @@ export class TrendService {
   constructor(
     private tickRepo: TickRepo,
     private weaponRepo: WeaponRepo,
-    private trackedRepo?: TrackedRepo
+    private trackedRepo?: TrackedRepo,
+    private kv?: KVNamespace,
+    private coordinator?: DurableObjectNamespace
   ) {}
 
   /**
    * 获取价格趋势
    */
   async getTrend(weaponSlug: string, range: string, platform: string = 'pc', mode: string = 'raw') {
+    // 1. 尝试从 DO 内存缓存获取近期历史 (针对 raw 模式或 1h 区间请求)
+    // mode=raw 默认返回最近 100 条原始数据，不再受 rangeMap 限制
+    if (this.coordinator && (mode === 'raw' || range === '1h')) {
+      try {
+        const doId = this.coordinator.idFromName("global");
+        const stub = this.coordinator.get(doId);
+        const resp = await stub.fetch(`http://do/recent-history?slug=${weaponSlug}`);
+        if (resp.ok) {
+          const history = (await resp.json()) as Tick[];
+          if (history.length > 0) {
+            // 如果是聚合模式，直接对内存中的原始数据进行聚合计算
+            const isAggregated = mode === 'aggregated';
+            const displayData = isAggregated ? this.aggregateTicks(history, range) : history;
+
+            return {
+              meta: {
+                weapon: weaponSlug,
+                platform,
+                range: mode === 'raw' ? 'recent_100' : range,
+                mode,
+                aggregated: isAggregated,
+                interval_minutes: isAggregated ? this.getAggregationIntervalMinutes(range) : 1,
+                source: 'do_memory',
+                last_updated_utc: history[history.length - 1].ts,
+                calculation: "ingame_only; top5_weighted_buyout; outlier_drop_p1_if_p1_lt_0.6_mean(p2,p3)"
+              },
+              data: displayData.map((t: any) => ({
+                ts: t.ts,
+                bottom_price: t.bottom_price,
+                sample_count: t.sample_count,
+                active_count: t.active_count,
+                min_price: t.min_price,
+                p5_price: t.p5_price,
+                p10_price: t.p10_price,
+                status: isAggregated ? t.status : t.source_status,
+                aggregated_count: isAggregated ? t.aggregated_count : undefined
+              }))
+            };
+          }
+        }
+      } catch (e) {
+        console.error("[TrendService] DO cache fetch failed:", e);
+      }
+    }
+
+    // 2. 尝试从 KV 读取趋势缓存 (针对 D1 查询结果)
+    const cacheKey = `riven:trend:${platform}:${weaponSlug}:${range}:${mode}`;
+    if (this.kv) {
+      const cached = await this.kv.get(cacheKey);
+      if (cached) {
+        try {
+          return { ...JSON.parse(cached), source: 'kv_trend' };
+        } catch {}
+      }
+    }
+
     const now = new Date();
     let startTime: Date;
 
     // 解析范围
     const rangeMap: Record<string, number> = {
-      '24h': 1,
-      '1h': 1,    // 聚合模式：1小时区间显示24小时数据
-      '4h': 7,    // 聚合模式：4小时区间显示7天数据
-      '1d': 30,   // 聚合模式：1天区间显示30天数据
-      '48h': 2,
-      '7d': 7,
-      '30d': 30,
-      '90d': 90
+      '1h': 1,    // 24 小时
+      '4h': 7,    // 7 天
+      '1d': 30,   // 30 天
     };
     const days = rangeMap[range] || 30;
     startTime = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
-    let ticks = await this.tickRepo.getTrend(weaponSlug, platform, startTime.toISOString());
+    // 3. 决定是否使用 SQL 级别聚合
+    // 针对长跨度（>= 7天）且开启聚合模式的请求，直接让数据库进行 GROUP BY
+    const useSqlAggregation = mode === 'aggregated' && days >= 7;
+    
+    let displayData: any[] = [];
+    let aggregated = mode === 'aggregated';
     const latestTick = await this.tickRepo.getLatestTick(weaponSlug, platform);
 
-    // 如果是聚合模式，进行数据聚合
-    let aggregated = false;
-    let aggregatedTicks: AggregatedTick[] = [];
-    if (mode === 'aggregated') {
-      aggregatedTicks = this.aggregateTicks(ticks, range);
-      aggregated = true;
+    if (useSqlAggregation) {
+      // 根据 range 决定 SQL 聚合颗粒度
+      let interval: 'day' | 'hour' | '4hour' = 'day';
+      if (range === '1h') interval = 'hour';
+      else if (range === '4h') interval = '4hour';
+      
+      displayData = await this.tickRepo.getAggregatedTrend(weaponSlug, platform, startTime.toISOString(), interval);
+    } else {
+      // 原始模式或短跨度：拉取原始数据
+      const ticks = await this.tickRepo.getTrend(weaponSlug, platform, startTime.toISOString());
+      if (aggregated) {
+        displayData = this.aggregateTicks(ticks, range);
+      } else {
+        displayData = ticks.map(t => ({ ...t, status: t.source_status }));
+      }
     }
 
-    return {
+    const result = {
       meta: {
         weapon: weaponSlug,
         platform,
         range,
         mode,
         aggregated,
-        interval_minutes: mode === 'aggregated' ? this.getAggregationIntervalMinutes(range) : 30,
+        interval_minutes: aggregated ? this.getAggregationIntervalMinutes(range) : 30,
         calculation: "ingame_only; top5_weighted_buyout; outlier_drop_p1_if_p1_lt_0.6_mean(p2,p3)",
-        last_updated_utc: latestTick?.ts || null
+        last_updated_utc: latestTick?.ts || null,
+        source: useSqlAggregation ? 'd1_sql_agg' : 'd1_raw'
       },
-      data: aggregated ? aggregatedTicks.map(t => ({
+      data: displayData.map(t => ({
         ts: t.ts,
         bottom_price: t.bottom_price,
         sample_count: t.sample_count,
@@ -63,17 +131,19 @@ export class TrendService {
         p10_price: t.p10_price,
         status: t.status,
         aggregated_count: t.aggregated_count
-      })) : ticks.map(t => ({
-        ts: t.ts,
-        bottom_price: t.bottom_price,
-        sample_count: t.sample_count,
-        active_count: t.active_count,
-        min_price: t.min_price,
-        p5_price: t.p5_price,
-        p10_price: t.p10_price,
-        status: t.source_status
       }))
     };
+
+    // 3. 异步存入 KV 缓存 (针对长周期或聚合请求，延长至 4 小时以节省额度)
+    if (this.kv) {
+      const kv = this.kv;
+      // 1h Raw 模式若漏到 D1 查询，给 5 分钟缓存；
+      // 其余长周期或聚合查询，一律给 4 小时 (14400s)
+      const ttl = (range === '1h' && mode === 'raw') ? 300 : 14400;
+      kv.put(cacheKey, JSON.stringify(result), { expirationTtl: ttl }).catch(() => {});
+    }
+
+    return result;
   }
 
   /**
@@ -168,8 +238,23 @@ export class TrendService {
    * 获取当前底价快照
    */
   async getLatest(weaponSlug: string, platform: string = 'pc') {
+    // 1. 优先尝试从合并后的 KV 快照读取 (riven:latest:pc)
+    if (this.kv) {
+      const bundleKey = `riven:latest:${platform}`;
+      const cachedBundle = await this.kv.get(bundleKey);
+      if (cachedBundle) {
+        try {
+          const bundle = JSON.parse(cachedBundle);
+          if (bundle[weaponSlug]) {
+            return { data: bundle[weaponSlug], source: 'kv_bundle' };
+          }
+        } catch {}
+      }
+    }
+
+    // 2. 降级查 D1
     const tick = await this.tickRepo.getLatestTick(weaponSlug, platform);
-    return { data: tick };
+    return { data: tick, source: 'd1' };
   }
 
   /**
@@ -183,35 +268,30 @@ export class TrendService {
   /**
    * 获取热门武器
    */
-  async getHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price') {
+  async getNewHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price') {
+    const cacheKey = `riven:hotlist:${sortBy}:${limit}`;
+    
+    // 1. 尝试从 KV 读取缓存的热门榜单
+    if (this.kv) {
+      const cached = await this.kv.get(cacheKey);
+      if (cached) {
+        try {
+          return { ...JSON.parse(cached), source: 'kv' };
+        } catch {}
+      }
+    }
+
+    // 2. 查 D1
     const results = await this.tickRepo.getLatestHotWeapons(limit, sortBy);
-    return { data: results };
+    
+    // 3. 异步写入缓存（有效期 5 分钟，避免榜单频繁刷新）
+    const result = { data: results, source: 'd1' };
+    if (this.kv && results.length > 0) {
+      this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }).catch(() => {});
+    }
+
+    return result;
   }
 
-  /**
-   * 获取武器的缓存时间（基于 tier）
-   * @returns 缓存时间（秒）
-   */
-  async getCacheTTL(weaponSlug: string): Promise<number> {
-    if (!this.trackedRepo) return 300; // 默认 5 分钟
-    
-    try {
-      // 查询武器的 tier
-      const weapons = await this.trackedRepo.getEnabledTracked();
-      const weapon = weapons.find(w => w.slug === weaponSlug);
-      
-      if (!weapon) return 300; // 未追踪的武器，默认 5 分钟
-      
-      // 根据 tier 返回不同的缓存时间
-      if (weapon.tier === 'hot') {
-        return 300; // 热门武器：5 分钟
-      } else {
-        return 7200; // 冷门武器：2 小时
-      }
-    } catch (e) {
-      console.error('[TrendService] getCacheTTL failed:', e);
-      return 300; // 出错时默认 5 分钟
-    }
-  }
 }
 

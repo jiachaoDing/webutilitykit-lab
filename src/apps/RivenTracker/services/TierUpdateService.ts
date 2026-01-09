@@ -87,7 +87,9 @@ export class TierUpdateService {
       console.log(`[TierUpdate] No tier changes needed.`);
     }
 
-    // 6. 返回更新结果
+    // 6. 标记完成，由外部触发 DO 刷新
+
+    // 7. 返回更新结果
     const result: TierUpdateResult = {
       updated_at: now.toISOString(),
       total_tracked: allTracked.length,

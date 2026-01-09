@@ -33,7 +33,6 @@ export class JobRunRepo {
         .run(),
     );
     // D1Result 可能包含 meta.changes
-    // @ts-expect-error D1 meta typing differs between runtimes
     return (res as any)?.meta?.changes ?? 0;
   }
 }
