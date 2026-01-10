@@ -79,6 +79,23 @@ export class TickRepo {
   }
 
   /**
+   * 获取最近的 N 条原始采样数据
+   */
+  async getRecentTicks(weaponSlug: string, platform: string, limit: number = 100) {
+    const { results } = await d1WithRetry("riven_bottom_tick.getRecentTicks", () =>
+      this.db.prepare(`
+        SELECT ts, bottom_price, sample_count, active_count, min_price, p5_price, p10_price, source_status 
+        FROM riven_bottom_tick
+        WHERE weapon_slug = ? AND platform = ? AND source_status = 'ok'
+        ORDER BY ts DESC
+        LIMIT ?
+      `).bind(weaponSlug, platform, limit).all<Tick>(),
+    );
+    // 返回时需要按时间正序排列
+    return results.reverse();
+  }
+
+  /**
    * 获取 SQL 级别聚合的趋势数据
    * @param interval 'day' | 'hour' | '4hour'
    */
@@ -133,9 +150,9 @@ export class TickRepo {
 
   /**
    * 获取当前最新热门武器排行（最近采样的数据）
-   * 优化：避免因采样频率不同导致排名失真
+   * 优化：使用聚合代替窗口函数，提高大表查询性能
    */
-  async getLatestHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price') {
+  async getLatestHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price', platform: string = 'pc') {
     const orderBy = sortBy === 'price' 
       ? 't.bottom_price DESC, t.active_count DESC' 
       : 't.active_count DESC, t.bottom_price ASC';
@@ -155,36 +172,22 @@ export class TickRepo {
           t.min_price,
           t.bottom_price,
           t.ts
-        FROM (
-          SELECT 
-            weapon_slug,
-            bottom_price,
-            active_count,
-            min_price,
-            ts,
-            ROW_NUMBER() OVER (PARTITION BY weapon_slug ORDER BY ts DESC) as rn
-          FROM riven_bottom_tick
-          WHERE source_status = 'ok' 
-            AND ts >= datetime('now', '-24 hours')
-        ) t
+        FROM riven_bottom_tick t
         JOIN riven_weapon_dict w ON t.weapon_slug = w.slug
-        WHERE t.rn = 1 AND t.active_count >= 10
+        WHERE t.platform = ? 
+          AND t.source_status = 'ok' 
+          AND t.active_count >= 10
+          AND t.ts = (
+            SELECT MAX(ts) 
+            FROM riven_bottom_tick 
+            WHERE weapon_slug = t.weapon_slug 
+              AND platform = t.platform 
+              AND source_status = 'ok'
+              AND ts >= datetime('now', '-24 hours')
+          )
         ORDER BY ${orderBy}
         LIMIT ?
-      `).bind(limit).all<{
-        slug: string;
-        name_en: string;
-        name_zh: string | null;
-        thumb: string;
-        group: string;
-        rivenType: string;
-        disposition: number;
-        req_mr: number;
-        active_count: number;
-        min_price: number;
-        bottom_price: number;
-        ts: string;
-      }>(),
+      `).bind(platform, limit).all<any>(),
     );
     
     return results;

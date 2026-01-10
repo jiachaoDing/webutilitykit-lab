@@ -88,7 +88,7 @@ rivenTrackerApp.get("/bottom-now", async (c) => {
 
 /**
  * 获取最新热门/高价武器
- * 缓存策略：3 分钟（榜单变化较快）
+ * 缓存策略：20 分钟（匹配采样周期）
  */
 rivenTrackerApp.get("/hot-weapons", async (c) => {
   const limit = parseInt(c.req.query("limit") || "10");
@@ -102,9 +102,9 @@ rivenTrackerApp.get("/hot-weapons", async (c) => {
     c.executionCtx
   );
   
-  // 热门榜单缓存 3 分钟
-  c.header('Cache-Control', 'public, max-age=180, s-maxage=180');
-  c.header('CDN-Cache-Control', 'max-age=180');
+  // 热门榜单缓存 20 分钟
+  c.header('Cache-Control', 'public, max-age=1200, s-maxage=1200');
+  c.header('CDN-Cache-Control', 'max-age=1200');
   
   return c.json(await trendService.getNewHotWeapons(limit, sortBy));
 });

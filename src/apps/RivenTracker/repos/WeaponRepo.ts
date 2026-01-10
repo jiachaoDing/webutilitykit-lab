@@ -50,5 +50,42 @@ export class WeaponRepo {
     const { results } = await this.db.prepare(`SELECT slug FROM riven_weapon_dict`).all<{ slug: string }>();
     return results.map(r => r.slug);
   }
+
+  async getAllWeapons(): Promise<RivenWeapon[]> {
+    const { results } = await this.db.prepare(`
+      SELECT 
+        slug, 
+        name_en, 
+        name_zh,
+        icon, 
+        thumb, 
+        weapon_group as "group", 
+        riven_type as "rivenType", 
+        disposition, 
+        req_mr 
+      FROM riven_weapon_dict
+    `).all<RivenWeapon>();
+    return results;
+  }
+
+  async getBySlugs(slugs: string[]): Promise<RivenWeapon[]> {
+    if (slugs.length === 0) return [];
+    const placeholders = slugs.map(() => '?').join(',');
+    const { results } = await this.db.prepare(`
+      SELECT 
+        slug, 
+        name_en, 
+        name_zh,
+        icon, 
+        thumb, 
+        weapon_group as "group", 
+        riven_type as "rivenType", 
+        disposition, 
+        req_mr 
+      FROM riven_weapon_dict
+      WHERE slug IN (${placeholders})
+    `).bind(...slugs).all<RivenWeapon>();
+    return results;
+  }
 }
 

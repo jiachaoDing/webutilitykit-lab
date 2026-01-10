@@ -26,8 +26,10 @@ export class TrendService {
         const resp = await stub.fetch(`http://do/recent-history?slug=${weaponSlug}`);
         if (resp.ok) {
           const history = (await resp.json()) as Tick[];
-          // 优化逻辑：如果数据点太少（少于 10 个），不使用 DO 缓存，回退到 D1/KV 以获取更完整的历史
-          if (history.length >= 10 || (mode === 'raw' && history.length > 0)) {
+          // 优化逻辑：如果数据点太少（少于 60 个），说明 DO 可能刚重启或该武器采样刚开始，
+          // 此时 DO 无法提供足够的历史深度（热门武器 60 个点仅代表 1 小时），
+          // 因此不使用 DO 缓存，回退到 D1/KV 以获取更完整的 24h 历史数据。
+          if (history.length >= 10) {
             const isAggregated = mode === 'aggregated';
             const displayData = isAggregated ? this.aggregateTicks(history, range) : history;
 
@@ -78,11 +80,12 @@ export class TrendService {
 
     // 解析范围
     const rangeMap: Record<string, number> = {
+      '24h': 1,   // 24 小时
       '1h': 1,    // 24 小时
       '4h': 7,    // 7 天
       '1d': 30,   // 30 天
     };
-    const days = rangeMap[range] || 30;
+    const days = rangeMap[range] || 1; // 默认 1 天，避免默认 30 天导致 raw 数据过载
     startTime = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
 
     // 3. 决定是否使用 SQL 级别聚合
@@ -147,11 +150,11 @@ export class TrendService {
     if (this.kv) {
       const kv = this.kv;
       // 策略：
-      // 1. 1h range + raw mode: 10 分钟 (600s)，保证原始数据相对新鲜
+      // 1. 24h/1h range + raw mode: 10 分钟 (600s)，保证原始数据相对新鲜
       // 2. 1h range + aggregated mode: 1 小时 (3600s)，匹配聚合步长
       // 3. 其他长周期 (7天/30天): 4 小时 (14400s)
       let ttl = 14400;
-      if (range === '1h') {
+      if (range === '1h' || range === '24h') {
         ttl = mode === 'raw' ? 600 : 3600;
       }
       
@@ -288,9 +291,23 @@ export class TrendService {
    * 获取热门武器
    */
   async getNewHotWeapons(limit: number = 10, sortBy: 'active_count' | 'price' = 'price') {
+    // 1. 针对价格排序且 limit <= 50 的情况，优先使用 DO 预计算的快照
+    if (sortBy === 'price' && limit <= 50 && this.kv) {
+      const precomputed = await this.kv.get("riven:hotlist:price:top50");
+      if (precomputed) {
+        try {
+          const { data } = JSON.parse(precomputed);
+          // 截取用户需要的长度
+          return { data: data.slice(0, limit), source: 'kv_precomputed' };
+        } catch (e) {
+          console.error("[TrendService] Parse precomputed hotlist failed:", e);
+        }
+      }
+    }
+
     const cacheKey = `riven:hotlist:${sortBy}:${limit}`;
     
-    // 1. 尝试从 KV 读取缓存的热门榜单
+    // 2. 尝试从 KV 读取缓存的热门榜单（针对非 Top50 价格榜单的情况）
     if (this.kv) {
       const cached = await this.kv.get(cacheKey);
       if (cached) {
@@ -300,13 +317,13 @@ export class TrendService {
       }
     }
 
-    // 2. 查 D1
+    // 3. 兜底查 D1
     const results = await this.tickRepo.getLatestHotWeapons(limit, sortBy);
     
-    // 3. 异步写入缓存（有效期 5 分钟，避免榜单频繁刷新）
+    // 4. 异步写入缓存（有效期 20 分钟，匹配采样周期）
     const result = { data: results, source: 'd1' };
     if (this.kv && results.length > 0) {
-      this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 300 }).catch(() => {});
+      this.kv.put(cacheKey, JSON.stringify(result), { expirationTtl: 1200 }).catch(() => {});
     }
 
     return result;
