@@ -93,8 +93,16 @@ export class TrendService {
     let aggregated = mode === 'aggregated';
     const latestTick = await this.tickRepo.getLatestTick(weaponSlug, platform);
 
-    if (useSqlAggregation) {
-      // 根据 range 决定 SQL 聚合颗粒度
+    if (aggregated && range === '1d') {
+      // 核心优化：如果是天级聚合请求，优先尝试从预聚合表读取
+      displayData = await this.tickRepo.getDailyTrend(weaponSlug, platform, startTime.toISOString());
+      
+      // 如果预聚合表没数据（比如新武器或刚上线此功能），降级走 D1 实时聚合
+      if (displayData.length === 0) {
+        displayData = await this.tickRepo.getAggregatedTrend(weaponSlug, platform, startTime.toISOString(), 'day');
+      }
+    } else if (useSqlAggregation) {
+      // 其他聚合（如 4h）走 SQL 实时聚合
       let interval: 'day' | 'hour' | '4hour' = 'day';
       if (range === '1h') interval = 'hour';
       else if (range === '4h') interval = '4hour';

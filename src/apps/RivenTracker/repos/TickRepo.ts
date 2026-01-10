@@ -189,5 +189,65 @@ export class TickRepo {
     
     return results;
   }
+
+  /**
+   * 将指定日期的原始数据聚合到 riven_daily_tick
+   * @param dateStr 格式 'YYYY-MM-DD'
+   */
+  async aggregateToDaily(dateStr: string) {
+    return d1WithRetry("riven_daily_tick.aggregateToDaily", () =>
+      this.db.prepare(`
+        INSERT INTO riven_daily_tick (
+          ts, platform, weapon_slug, 
+          avg_bottom_price, avg_active_count, min_price, 
+          avg_p5_price, avg_p10_price, sample_count, created_at
+        )
+        SELECT 
+          ? as ts,
+          platform,
+          weapon_slug,
+          CAST(AVG(bottom_price) AS INTEGER) as avg_bottom_price,
+          CAST(AVG(active_count) AS INTEGER) as avg_active_count,
+          MIN(min_price) as min_price,
+          CAST(AVG(p5_price) AS INTEGER) as avg_p5_price,
+          CAST(AVG(p10_price) AS INTEGER) as avg_p10_price,
+          COUNT(*) as sample_count,
+          datetime('now') as created_at
+        FROM riven_bottom_tick
+        WHERE ts LIKE ? || '%' AND source_status = 'ok'
+        GROUP BY platform, weapon_slug
+        ON CONFLICT(ts, platform, weapon_slug) DO UPDATE SET
+          avg_bottom_price = excluded.avg_bottom_price,
+          avg_active_count = excluded.avg_active_count,
+          min_price = excluded.min_price,
+          avg_p5_price = excluded.avg_p5_price,
+          avg_p10_price = excluded.avg_p10_price,
+          sample_count = excluded.sample_count,
+          created_at = excluded.created_at
+      `).bind(dateStr, dateStr).run()
+    );
+  }
+
+  /**
+   * 从天级聚合表获取趋势
+   */
+  async getDailyTrend(weaponSlug: string, platform: string, startTime: string) {
+    const { results } = await d1WithRetry("riven_daily_tick.getDailyTrend", () =>
+      this.db.prepare(`
+        SELECT 
+          ts || 'T00:00:00Z' as ts, 
+          avg_bottom_price as bottom_price, 
+          avg_active_count as active_count, 
+          min_price, 
+          avg_p5_price as p5_price, 
+          avg_p10_price as p10_price,
+          sample_count as aggregated_count
+        FROM riven_daily_tick
+        WHERE weapon_slug = ? AND platform = ? AND ts >= ?
+        ORDER BY ts ASC
+      `).bind(weaponSlug, platform, startTime.split('T')[0]).all<any>(),
+    );
+    return results;
+  }
 }
 

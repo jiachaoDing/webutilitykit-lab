@@ -40,6 +40,17 @@ export async function handleScheduled(event: any, env: any, ctx: any) {
       const result = await Promise.race([syncService.syncRivens(), timeoutPromise]) as any;
       await jobRepo.update(jobId, 'success', new Date().toISOString(), JSON.stringify(result));
       
+      // 新增：天级数据聚合
+      try {
+        console.log('[DailyAggregation] Starting...');
+        const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const dateStr = yesterday.toISOString().split('T')[0];
+        const aggResult = await new TickRepo(db).aggregateToDaily(dateStr);
+        console.log(`[DailyAggregation] Success for ${dateStr}, changes: ${aggResult.meta.changes}`);
+      } catch (e: any) {
+        console.error(`[DailyAggregation] Failed: ${e.message}`);
+      }
+
       // 字典同步成功后，更新武器分层（基于最近 7 天的价格统计）
       console.log('[TierUpdate] Starting weapon tier update...');
       const tierJobId = crypto.randomUUID();

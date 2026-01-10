@@ -255,5 +255,37 @@ rivenTrackerApp.get("/debug/tier-stats", async (c) => {
   });
 });
 
+/**
+ * 手动触发天级聚合
+ * POST /debug/aggregate?date=2026-01-09
+ * POST /debug/aggregate?backfillDays=30
+ */
+rivenTrackerApp.post("/debug/aggregate", async (c) => {
+  const dateStr = c.req.query("date");
+  const backfillDays = parseInt(c.req.query("backfillDays") || "0");
+  const { TickRepo } = await import("../repos/TickRepo");
+  const tickRepo = new TickRepo(c.env.DB);
+  
+  try {
+    if (backfillDays > 0) {
+      // 批量补全模式
+      const results = [];
+      for (let i = 1; i <= backfillDays; i++) {
+        const d = new Date(Date.now() - i * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const res = await tickRepo.aggregateToDaily(d);
+        results.push({ date: d, changes: res.meta.changes });
+      }
+      return c.json({ ok: true, mode: 'backfill', results });
+    } else {
+      // 单日模式
+      const targetDate = dateStr || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      const result = await tickRepo.aggregateToDaily(targetDate);
+      return c.json({ ok: true, date: targetDate, changes: result.meta.changes });
+    }
+  } catch (e: any) {
+    return c.json({ ok: false, error: e.message }, 500);
+  }
+});
+
 export default rivenTrackerApp;
 
