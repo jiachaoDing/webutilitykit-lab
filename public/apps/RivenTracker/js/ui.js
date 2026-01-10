@@ -30,7 +30,8 @@ export const UI = {
     trendTableBody: document.getElementById('trendTableBody'),
     dataTableContainer: document.getElementById('dataTableContainer'),
     hotWeaponsModal: document.getElementById('hotWeaponsModal'),
-    hotWeaponsModalContent: document.getElementById('hotWeaponsModalContent')
+    hotWeaponsModalContent: document.getElementById('hotWeaponsModalContent'),
+    themeToggle: document.getElementById('themeToggle')
   },
 
   getThumbUrl(thumb) {

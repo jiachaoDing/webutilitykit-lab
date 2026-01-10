@@ -37,3 +37,18 @@
   .dark .weapon-selected {
     background-color: rgba(139, 92, 246, 0.2) !important;
   }
+
+  /* 平滑主题切换动画 (与 RivenTracker 内部 duration-300 保持一致) */
+  body {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 针对所有带背景、边框或文字颜色的元素进行平滑过渡 */
+  header, div, section, main, nav, button, input, select, table, tr, th, td, a {
+    transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* 确保图标颜色也能平滑过渡 */
+  svg {
+    transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1), fill 0.3s cubic-bezier(0.4, 0, 0.2, 1), stroke 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }

@@ -62,6 +62,32 @@ export class ChartManager {
       ];
     }
 
+    if (this.chart && this.chart.data.datasets.length === datasets.length) {
+      // 如果图表已存在且数据集数量一致，尝试平滑更新颜色和数据
+      this.chart.data.datasets.forEach((ds, i) => {
+        ds.data = datasets[i].data;
+        ds.label = datasets[i].label;
+        ds.borderColor = datasets[i].borderColor;
+        ds.backgroundColor = datasets[i].backgroundColor;
+        if (ds.pointHoverBackgroundColor) ds.pointHoverBackgroundColor = datasets[i].pointHoverBackgroundColor;
+      });
+
+      const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
+      const textColor = isDark ? '#94a3b8' : '#64748b';
+
+      this.chart.options.scales.x.ticks.color = textColor;
+      this.chart.options.scales.y.ticks.color = textColor;
+      this.chart.options.scales.y.grid.color = gridColor;
+      
+      this.chart.options.plugins.tooltip.backgroundColor = isDark ? '#1e293b' : '#fff';
+      this.chart.options.plugins.tooltip.titleColor = isDark ? '#f1f5f9' : '#0f172a';
+      this.chart.options.plugins.tooltip.bodyColor = isDark ? '#94a3b8' : '#64748b';
+      this.chart.options.plugins.tooltip.borderColor = isDark ? '#334155' : '#e2e8f0';
+
+      this.chart.update('active'); // 使用内置动画
+      return;
+    }
+
     if (this.chart) this.chart.destroy();
 
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
@@ -74,6 +100,7 @@ export class ChartManager {
       options: {
         responsive: true,
         maintainAspectRatio: false,
+        animation: { duration: 300 },
         interaction: { mode: 'index', intersect: false },
         scales: {
           x: {

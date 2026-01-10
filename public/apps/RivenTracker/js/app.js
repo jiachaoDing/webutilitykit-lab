@@ -11,7 +11,7 @@ class App {
       lastTrendData: null,
       weaponsCache: null,
       searchTimeout: null,
-      isDark: document.documentElement.classList.contains('dark')
+      isDark: this.initTheme()
     };
     this.chartManager = new ChartManager('trendChart');
     this.init();
@@ -45,6 +45,7 @@ class App {
     UI.elements.displayModeAggregatedBtn.onclick = () => this.switchDisplayMode('aggregated');
     UI.elements.resetZoomBtn.onclick = () => this.chartManager.resetZoom(UI.elements.rangeSelect.value, this.state.displayMode);
     UI.elements.rangeSelect.onchange = () => this.loadTrend();
+    UI.elements.themeToggle.onclick = () => this.toggleTheme();
 
     // 全局函数挂载（用于 HTML 中 onclick）
     window.toggleSection = (id, chevronId) => {
@@ -57,6 +58,28 @@ class App {
     window.showHotWeaponsModal = () => this.showHotWeaponsModal();
     window.closeHotWeaponsModal = (e) => this.closeHotWeaponsModal(e);
     UI.elements.copyNameBtn.onclick = () => this.copyWeaponName();
+  }
+
+  initTheme() {
+    const saved = localStorage.getItem('riven_tracker_theme');
+    const isDark = saved ? saved === 'dark' : document.documentElement.classList.contains('dark');
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    return isDark;
+  }
+
+  toggleTheme() {
+    this.state.isDark = !this.state.isDark;
+    document.documentElement.classList.toggle('dark', this.state.isDark);
+    localStorage.setItem('riven_tracker_theme', this.state.isDark ? 'dark' : 'light');
+    
+    // 如果有图表，需要重新渲染以应用主题颜色
+    if (this.state.lastTrendData) {
+      this.chartManager.render(this.state.lastTrendData, this.state.chartMode, this.state.displayMode, this.state.isDark);
+    }
   }
 
   async loadHealth() {
