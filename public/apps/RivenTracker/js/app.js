@@ -21,6 +21,7 @@ class App {
     this.bindEvents();
     this.updateDisplayModeUI();
     this.renderRecent();
+    UI.updateRangeHint(UI.elements.rangeSelect.value);
     
     // 异步加载初始化数据
     this.loadHealth();
@@ -44,7 +45,10 @@ class App {
     UI.elements.displayModeRawBtn.onclick = () => this.switchDisplayMode('raw');
     UI.elements.displayModeAggregatedBtn.onclick = () => this.switchDisplayMode('aggregated');
     UI.elements.resetZoomBtn.onclick = () => this.chartManager.resetZoom(UI.elements.rangeSelect.value, this.state.displayMode);
-    UI.elements.rangeSelect.onchange = () => this.loadTrend();
+    UI.elements.rangeSelect.onchange = () => {
+      UI.updateRangeHint(UI.elements.rangeSelect.value);
+      this.loadTrend();
+    };
     UI.elements.themeToggle.onclick = () => this.toggleTheme();
 
     // 全局函数挂载（用于 HTML 中 onclick）

@@ -37,6 +37,7 @@ export class ChartManager {
     }
 
     let datasets = [];
+    // ... (保持 datasets 逻辑不变)
     if (chartMode === 'price') {
       datasets = [
         {
@@ -83,6 +84,15 @@ export class ChartManager {
       ];
     }
 
+    // 计算滑动边界
+    const now = luxon.DateTime.now();
+    const rangeMap = { '24h': { hours: 24 }, '1h': { hours: 24 }, '4h': { days: 7 }, '1d': { days: 30 } };
+    const currentDuration = rangeMap[range] || { days: 30 };
+    
+    const firstPoint = data.length > 0 ? luxon.DateTime.fromISO(data[0].ts).toMillis() : now.minus(currentDuration).toMillis();
+    // 允许向右滑动一段距离（留白）
+    const limitMax = now.plus(currentDuration).toMillis();
+
     if (this.chart && this.chart.data.datasets.length === datasets.length) {
       this.chart.data.datasets.forEach((ds, i) => {
         ds.data = datasets[i].data;
@@ -91,6 +101,10 @@ export class ChartManager {
         ds.backgroundColor = datasets[i].backgroundColor;
         if (ds.pointHoverBackgroundColor) ds.pointHoverBackgroundColor = datasets[i].pointHoverBackgroundColor;
       });
+
+      // 更新限制
+      this.chart.options.plugins.zoom.limits.x.min = firstPoint;
+      this.chart.options.plugins.zoom.limits.x.max = limitMax;
 
       const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
       const textColor = isDark ? '#94a3b8' : '#64748b';
@@ -120,7 +134,6 @@ export class ChartManager {
 
     const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)';
     const textColor = isDark ? '#94a3b8' : '#64748b';
-    const now = luxon.DateTime.now();
 
     this.chart = new Chart(this.ctx, {
       type: 'line',
@@ -164,7 +177,12 @@ export class ChartManager {
           zoom: {
             pan: { enabled: true, mode: 'x', threshold: 10 },
             zoom: { wheel: { enabled: true, speed: 0.1 }, pinch: { enabled: true }, mode: 'x' },
-            limits: { x: { min: 'original', max: 'original' } }
+            limits: { 
+              x: { 
+                min: firstPoint, 
+                max: limitMax 
+              } 
+            }
           },
           tooltip: {
             backgroundColor: isDark ? '#1e293b' : '#fff',
@@ -176,7 +194,6 @@ export class ChartManager {
             callbacks: {
               title: (items) => {
                 if (!items.length) return '';
-                // Chart.js 4.x parsed.x 是毫秒时间戳
                 const date = luxon.DateTime.fromMillis(items[0].parsed.x);
                 return date.setLocale(this.lang === 'en' ? 'en' : 'zh').toFormat(this.lang === 'en' ? 'MMM dd, HH:mm' : 'MM-dd HH:mm');
               },
@@ -196,13 +213,19 @@ export class ChartManager {
   resetZoom(range, displayMode) {
     if (!this.chart) return;
     const now = luxon.DateTime.now();
-    let initialMin;
+    let duration;
+    
     if (displayMode === 'raw') {
-      initialMin = now.minus({ hours: 24 });
+      duration = { hours: 24 };
     } else {
       const rangeMap = { '1h': { hours: 24 }, '4h': { days: 7 }, '1d': { days: 30 } };
-      initialMin = now.minus(rangeMap[range] || { days: 30 });
+      duration = rangeMap[range] || { days: 30 };
     }
-    this.chart.zoomScale('x', { min: initialMin.toJSDate(), max: now.toJSDate() }, 'easeOutQuart');
+    
+    const initialMin = now.minus(duration);
+    // 将 max 设置为 now + duration，使 now 处于图表正中间
+    const initialMax = now.plus(duration);
+    
+    this.chart.zoomScale('x', { min: initialMin.toJSDate(), max: initialMax.toJSDate() }, 'easeOutQuart');
   }
 }

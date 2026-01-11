@@ -33,28 +33,35 @@ export const UI = {
     dataTableContainer: document.getElementById('dataTableContainer'),
     hotWeaponsModal: document.getElementById('hotWeaponsModal'),
     hotWeaponsModalContent: document.getElementById('hotWeaponsModalContent'),
-    themeToggle: document.getElementById('themeToggle')
+    themeToggle: document.getElementById('themeToggle'),
+    rangeHint: document.getElementById('rangeHint')
   },
 
   i18n: {
     en: {
-      noData: 'No sampling data available',
-      noMatch: 'No matching weapons found',
-      insufficient: 'Under 10 sellers',
-      never: 'Never',
-      sustained: 'Steady',
-      sellers: 'sellers',
-      weighted: 'Weighted'
+      // ... 
+      rangeHints: {
+        '24h': 'Displays last 24h raw data',
+        '1h': 'Displays last 24h aggregated data',
+        '4h': 'Displays last 7 days data',
+        '1d': 'Displays last 30 days data'
+      }
     },
     'zh-CN': {
-      noData: '暂无采样数据',
-      noMatch: '未找到匹配武器',
-      insufficient: '不足10人',
-      never: '从未',
-      sustained: '持平',
-      sellers: '卖家',
-      weighted: '加权'
+      // ...
+      rangeHints: {
+        '24h': '显示最近 24 小时原始采样',
+        '1h': '显示最近 24 小时聚合数据',
+        '4h': '显示最近 7 天聚合数据',
+        '1d': '显示最近 30 天聚合数据'
+      }
     }
+  },
+
+  updateRangeHint(range) {
+    if (!this.elements.rangeHint) return;
+    const hint = this.i18n[this.lang].rangeHints[range] || '';
+    this.elements.rangeHint.textContent = hint;
   },
 
   t(key) {
@@ -164,7 +171,9 @@ export const UI = {
 
   updateWeaponHeader(weapon) {
     this.elements.currentWeaponName.textContent = this.lang === 'en' ? weapon.name_en : (weapon.name_zh || weapon.name_en);
-    this.elements.weaponSubtext.textContent = `${weapon.rivenType || 'Unknown'} | Disp: ${weapon.disposition} | MR ${weapon.req_mr}`;
+    const typeLabel = this.i18n[this.lang].types[weapon.rivenType] || weapon.rivenType || 'Unknown';
+    const dispLabel = this.t('disposition');
+    this.elements.weaponSubtext.textContent = `${typeLabel} | ${dispLabel}: ${weapon.disposition}`;
     this.elements.weaponIcon.innerHTML = `<img src="${getThumbUrl(weapon.thumb)}" class="w-full h-full object-contain p-1" />`;
     this.elements.weaponIcon.classList.remove('bg-slate-100', 'dark:bg-slate-800');
     this.elements.weaponIcon.classList.add('bg-white', 'dark:bg-slate-900');
