@@ -127,11 +127,24 @@ export class ChartManager {
           x: {
             type: 'time',
             time: {
-              unit: mode === 'aggregated' ? (range === '1h' ? 'hour' : (range === '4h' ? 'day' : 'week')) : ((range === '24h' || range === '48h') ? 'hour' : (range === '7d' ? 'day' : 'week')),
-              displayFormats: { hour: 'HH:mm', day: 'MM-dd', week: 'MM-dd' }
+              unit: mode === 'aggregated' 
+                ? (range === '1h' ? 'hour' : 'day') 
+                : (range === '24h' ? 'hour' : 'day'),
+              displayFormats: { 
+                hour: 'HH:mm', 
+                day: 'MM-dd', 
+                week: 'MM-dd',
+                month: 'MM-dd'
+              }
             },
             grid: { display: false },
-            ticks: { color: textColor, font: { size: 10 }, maxRotation: 0, autoSkip: true, maxTicksLimit: mode === 'aggregated' ? (range === '1h' ? 12 : (range === '4h' ? 8 : 6)) : (range === '24h' ? 8 : 6) }
+            ticks: { 
+              color: textColor, 
+              font: { size: 10 }, 
+              maxRotation: 0, 
+              autoSkip: true, 
+              maxTicksLimit: mode === 'aggregated' ? (range === '1h' ? 12 : 8) : 8 
+            }
           },
           y: {
             beginAtZero: chartMode === 'sellers',
