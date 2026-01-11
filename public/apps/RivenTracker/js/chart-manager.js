@@ -139,9 +139,9 @@ export class ChartManager {
                 : (range === '24h' ? 'hour' : 'day'),
               displayFormats: { 
                 hour: 'HH:mm', 
-                day: 'MM-dd', 
-                week: 'MM-dd',
-                month: 'MM-dd'
+                day: this.lang === 'en' ? 'MMM dd' : 'MM-dd', 
+                week: this.lang === 'en' ? 'MMM dd' : 'MM-dd',
+                month: this.lang === 'en' ? 'MMM dd' : 'MM-dd'
               }
             },
             grid: { display: false },
@@ -174,6 +174,10 @@ export class ChartManager {
             borderWidth: 1,
             padding: 12,
             callbacks: {
+              title: (items) => {
+                const date = luxon.DateTime.fromJSDate(items[0].parsed.x);
+                return date.setLocale(this.lang === 'en' ? 'en' : 'zh').toFormat(this.lang === 'en' ? 'MMM dd, HH:mm' : 'MM-dd HH:mm');
+              },
               label: (context) => {
                 const unit = chartMode === 'price' ? this.t('unitPrice') : this.t('unitSellers');
                 return ` ${context.dataset.label.split(' (')[0]}: ${context.parsed.y}${unit}`;
