@@ -175,7 +175,9 @@ export class ChartManager {
             padding: 12,
             callbacks: {
               title: (items) => {
-                const date = luxon.DateTime.fromJSDate(items[0].parsed.x);
+                if (!items.length) return '';
+                // Chart.js 4.x parsed.x 是毫秒时间戳
+                const date = luxon.DateTime.fromMillis(items[0].parsed.x);
                 return date.setLocale(this.lang === 'en' ? 'en' : 'zh').toFormat(this.lang === 'en' ? 'MMM dd, HH:mm' : 'MM-dd HH:mm');
               },
               label: (context) => {
