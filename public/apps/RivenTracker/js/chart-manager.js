@@ -99,6 +99,13 @@ export class ChartManager {
       this.chart.options.scales.y.ticks.color = textColor;
       this.chart.options.scales.y.grid.color = gridColor;
       
+      // 同步更新横坐标单位逻辑
+      const newUnit = mode === 'aggregated' 
+        ? (range === '1h' ? 'hour' : 'day') 
+        : (range === '24h' ? 'hour' : 'day');
+      this.chart.options.scales.x.time.unit = newUnit;
+      this.chart.options.scales.x.ticks.maxTicksLimit = mode === 'aggregated' ? (range === '1h' ? 12 : 8) : 8;
+
       this.chart.options.plugins.tooltip.backgroundColor = isDark ? '#1e293b' : '#fff';
       this.chart.options.plugins.tooltip.titleColor = isDark ? '#f1f5f9' : '#0f172a';
       this.chart.options.plugins.tooltip.bodyColor = isDark ? '#94a3b8' : '#64748b';
