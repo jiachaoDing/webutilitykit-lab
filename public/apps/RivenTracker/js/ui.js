@@ -1,6 +1,8 @@
 import { getThumbUrl } from './utils.js';
 
 export const UI = {
+  lang: document.documentElement.lang || 'zh-CN',
+
   elements: {
     searchInput: document.getElementById('searchInput'),
     searchResults: document.getElementById('searchResults'),
@@ -34,23 +36,49 @@ export const UI = {
     themeToggle: document.getElementById('themeToggle')
   },
 
+  i18n: {
+    en: {
+      noData: 'No sampling data available',
+      noMatch: 'No matching weapons found',
+      insufficient: 'Under 10 sellers',
+      never: 'Never',
+      sustained: 'Steady',
+      sellers: 'sellers',
+      weighted: 'Weighted'
+    },
+    'zh-CN': {
+      noData: '暂无采样数据',
+      noMatch: '未找到匹配武器',
+      insufficient: '不足10人',
+      never: '从未',
+      sustained: '持平',
+      sellers: '卖家',
+      weighted: '加权'
+    }
+  },
+
+  t(key) {
+    const dict = this.i18n[this.lang] || this.i18n['zh-CN'];
+    return dict[key] || key;
+  },
+
   getThumbUrl(thumb) {
     return getThumbUrl(thumb);
   },
 
   updateHealth(data) {
     this.elements.trackedCount.textContent = data.tracked_weapon_count;
-    this.elements.lastUpdate.textContent = data.last_tick_utc ? luxon.DateTime.fromISO(data.last_tick_utc).toRelative({ locale: 'zh' }) : '从未';
+    this.elements.lastUpdate.textContent = data.last_tick_utc ? luxon.DateTime.fromISO(data.last_tick_utc).toRelative({ locale: this.lang === 'en' ? 'en' : 'zh' }) : this.t('never');
   },
 
   renderHotWeapons(weapons, currentWeapon, onSelect) {
     if (!weapons || weapons.length === 0) {
-      this.elements.hotList.innerHTML = '<div class="text-xs text-slate-400 italic py-2">暂无采样数据</div>';
+      this.elements.hotList.innerHTML = `<div class="text-xs text-slate-400 italic py-2">${this.t('noData')}</div>`;
       return;
     }
 
     this.elements.hotList.innerHTML = weapons.map((w, index) => {
-      const displayName = w.name_zh || w.name_en;
+      const displayName = this.lang === 'en' ? w.name_en : (w.name_zh || w.name_en);
       const isSelected = currentWeapon && currentWeapon.slug === w.slug;
       const weaponData = JSON.stringify(w).replace(/'/g, "&apos;");
       return `
@@ -66,14 +94,13 @@ export const UI = {
             <div class="text-[11px] font-bold text-slate-700 dark:text-slate-300 truncate">${displayName}</div>
             <div class="flex items-center gap-2">
               <span class="text-[9px] text-violet-500 font-mono font-bold">${w.bottom_price || w.min_price} p</span>
-              <span class="text-[9px] text-slate-400 font-mono">${w.active_count} 卖家</span>
+              <span class="text-[9px] text-slate-400 font-mono">${w.active_count} ${this.t('sellers')}</span>
             </div>
           </div>
         </div>
       `;
     }).join('');
 
-    // 绑定事件
     this.elements.hotList.querySelectorAll('.weapon-item').forEach(el => {
       el.onclick = () => onSelect(JSON.parse(el.dataset.weapon));
     });
@@ -86,7 +113,7 @@ export const UI = {
     }
     this.elements.recentContainer.classList.remove('hidden');
     this.elements.recentList.innerHTML = recent.map(w => {
-      const displayName = w.name_zh || w.name_en;
+      const displayName = this.lang === 'en' ? w.name_en : (w.name_zh || w.name_en);
       const isSelected = currentWeapon && currentWeapon.slug === w.slug;
       const weaponData = JSON.stringify(w).replace(/'/g, "&apos;");
       return `
@@ -111,10 +138,10 @@ export const UI = {
   renderSearchResults(weapons, onSelect) {
     this.elements.searchResults.innerHTML = '';
     if (weapons.length === 0) {
-      this.elements.searchResults.innerHTML = '<div class="p-4 text-sm text-slate-500 italic text-center">未找到匹配武器</div>';
+      this.elements.searchResults.innerHTML = `<div class="p-4 text-sm text-slate-500 italic text-center">${this.t('noMatch')}</div>`;
     } else {
       weapons.forEach(w => {
-        const displayName = w.name_zh || w.name_en;
+        const displayName = this.lang === 'en' ? w.name_en : (w.name_zh || w.name_en);
         const div = document.createElement('div');
         div.className = 'group p-2 hover:bg-violet-50 dark:hover:bg-violet-500/10 cursor-pointer rounded-xl transition-all flex items-center gap-3 border border-transparent hover:border-violet-200 dark:hover:border-violet-500/20';
         div.innerHTML = `
@@ -136,14 +163,15 @@ export const UI = {
   },
 
   updateWeaponHeader(weapon) {
-    this.elements.currentWeaponName.textContent = weapon.name_zh || weapon.name_en;
-    this.elements.weaponSubtext.textContent = `${weapon.rivenType || '未知类型'} | 倾向: ${weapon.disposition} | MR ${weapon.req_mr}`;
+    this.elements.currentWeaponName.textContent = this.lang === 'en' ? weapon.name_en : (weapon.name_zh || weapon.name_en);
+    this.elements.weaponSubtext.textContent = `${weapon.rivenType || 'Unknown'} | Disp: ${weapon.disposition} | MR ${weapon.req_mr}`;
     this.elements.weaponIcon.innerHTML = `<img src="${getThumbUrl(weapon.thumb)}" class="w-full h-full object-contain p-1" />`;
     this.elements.weaponIcon.classList.remove('bg-slate-100', 'dark:bg-slate-800');
     this.elements.weaponIcon.classList.add('bg-white', 'dark:bg-slate-900');
     this.elements.copyNameBtn.classList.remove('hidden');
     this.elements.weaponActions.classList.remove('hidden');
-    this.elements.wfmLink.href = `https://warframe.market/zh-hans/auctions/search?type=riven&sort_by=price_asc&weapon_url_name=${weapon.slug}`;
+    const wfmMarketLang = this.lang === 'en' ? 'en' : 'zh-hans';
+    this.elements.wfmLink.href = `https://warframe.market/${wfmMarketLang}/auctions/search?type=riven&sort_by=price_asc&weapon_url_name=${weapon.slug}`;
   },
 
   updateStats(trendData) {
@@ -164,7 +192,7 @@ export const UI = {
       this.elements.priceChange.textContent = `${diff} (${percent}%)`;
       this.elements.priceChange.className = 'text-lg font-mono font-bold text-rose-500';
     } else {
-      this.elements.priceChange.textContent = '持平';
+      this.elements.priceChange.textContent = this.t('sustained');
       this.elements.priceChange.className = 'text-lg font-mono font-bold text-slate-400';
     }
 
@@ -186,7 +214,7 @@ export const UI = {
         <td class="px-4 py-3 text-right">${d.min_price || '--'}</td>
         <td class="px-4 py-3 text-right">${d.p5_price || '--'}</td>
         <td class="px-4 py-3 text-right font-mono text-slate-500">
-          ${(d.active_count !== undefined && d.active_count !== null && d.active_count < 10) ? '<span class="text-[9px] text-slate-400 italic">不足10人</span>' : (d.p10_price || '--')}
+          ${(d.active_count !== undefined && d.active_count !== null && d.active_count < 10) ? `<span class="text-[9px] text-slate-400 italic">${this.t('insufficient')}</span>` : (d.p10_price || '--')}
         </td>
       </tr>
     `).join('');

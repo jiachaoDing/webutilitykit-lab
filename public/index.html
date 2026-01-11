@@ -7,7 +7,7 @@
     <link rel="stylesheet" href="/assets/tailwind.css" />
   </head>
   <body class="font-sans">
-    <main class="max-w-6xl mx-auto px-6 py-10 md:py-16">
+    <main class="lab-dashboard max-w-6xl mx-auto px-6 py-10 md:py-16">
       <header class="flex flex-col md:flex-row gap-6 items-start md:items-center justify-between p-6 border border-white/10 rounded-2xl bg-black/20 backdrop-blur-xl">
         <div class="flex items-center gap-4">
           <div class="w-12 h-12 rounded-xl flex items-center justify-center font-black tracking-widest border border-white/10 bg-gradient-to-br from-violet-500/30 to-sky-400/20 shadow-inner">
@@ -34,13 +34,25 @@
         </a>
 
         <!-- Riven Tracker App -->
-        <a href="/apps/RivenTracker/" class="group block p-6 rounded-2xl border border-white/10 bg-white/5 hover:border-violet-500/50 hover:bg-white/10 transition-all relative overflow-hidden">
-          <h3 class="font-bold text-lg text-white group-hover:text-violet-400 transition-colors">Riven Tracker</h3>
-          <p class="mt-2 text-white/50 text-sm leading-relaxed text-balance">Warframe 紫卡底价趋势追踪。每 30 分钟采样，支持 7/30/90 天底价变动分析。</p>
-          <div class="absolute top-4 right-4 px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
-            Beta
+        <div class="group p-6 rounded-2xl border border-white/10 bg-white/5 hover:border-violet-500/50 hover:bg-white/10 transition-all relative overflow-hidden flex flex-col justify-between">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <h3 class="font-bold text-lg text-white group-hover:text-violet-400 transition-colors">Riven Tracker</h3>
+              <div class="px-2.5 py-0.5 rounded-full text-[10px] uppercase tracking-wider font-bold border border-emerald-500/20 bg-emerald-500/10 text-emerald-500">
+                Beta
+              </div>
+            </div>
+            <p class="text-white/50 text-sm leading-relaxed text-balance mb-6">Warframe 紫卡底价趋势追踪。每 30 分钟采样，支持 7/30/90 天底价变动分析。</p>
           </div>
-        </a>
+          <div class="flex items-center gap-3">
+            <a href="/apps/RivenTracker/" class="flex-grow text-center px-4 py-2 rounded-xl bg-violet-500 text-white text-xs font-bold hover:bg-violet-600 transition-all active:scale-95">
+              进入中文版
+            </a>
+            <a href="/apps/RivenTracker/en/" class="px-4 py-2 rounded-xl border border-white/10 bg-white/5 text-white/70 text-xs font-bold hover:bg-white/10 transition-all active:scale-95">
+              English
+            </a>
+          </div>
+        </div>
       </section>
     </main>
   </body>

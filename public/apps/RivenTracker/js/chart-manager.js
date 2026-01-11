@@ -4,6 +4,27 @@ export class ChartManager {
   constructor(canvasId) {
     this.ctx = document.getElementById(canvasId).getContext('2d');
     this.chart = null;
+    this.lang = document.documentElement.lang || 'zh-CN';
+  }
+
+  t(key) {
+    const i18n = {
+      en: {
+        weightedBottomPrice: 'Weighted Price (Platinum)',
+        absoluteMinPrice: 'Absolute Min Price',
+        activeSellers: 'Active Sellers In-Game',
+        unitPrice: ' p',
+        unitSellers: ' users'
+      },
+      'zh-CN': {
+        weightedBottomPrice: '加权底价 (Platinum)',
+        absoluteMinPrice: '绝对最小价',
+        activeSellers: '游戏中卖家数',
+        unitPrice: ' p',
+        unitSellers: ' 人'
+      }
+    };
+    return i18n[this.lang][key] || key;
   }
 
   render(trendData, chartMode, displayMode, isDark) {
@@ -19,7 +40,7 @@ export class ChartManager {
     if (chartMode === 'price') {
       datasets = [
         {
-          label: mode === 'aggregated' ? '区间加权底价 (Platinum)' : '加权底价 (Platinum)',
+          label: this.t('weightedBottomPrice'),
           data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.bottom_price })),
           borderColor: '#6366f1',
           borderWidth: 3,
@@ -33,7 +54,7 @@ export class ChartManager {
           pointHoverBorderWidth: 2
         },
         {
-          label: '绝对最小价',
+          label: this.t('absoluteMinPrice'),
           data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.min_price })),
           borderColor: isDark ? 'rgba(148, 163, 184, 0.4)' : 'rgba(148, 163, 184, 0.6)',
           borderWidth: 1.5,
@@ -46,7 +67,7 @@ export class ChartManager {
     } else {
       datasets = [
         {
-          label: mode === 'aggregated' ? '区间平均卖家数' : '游戏中卖家数',
+          label: this.t('activeSellers'),
           data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.active_count ?? d.sample_count ?? 0 })),
           borderColor: '#10b981',
           borderWidth: 3,
@@ -63,7 +84,6 @@ export class ChartManager {
     }
 
     if (this.chart && this.chart.data.datasets.length === datasets.length) {
-      // 如果图表已存在且数据集数量一致，尝试平滑更新颜色和数据
       this.chart.data.datasets.forEach((ds, i) => {
         ds.data = datasets[i].data;
         ds.label = datasets[i].label;
@@ -84,7 +104,8 @@ export class ChartManager {
       this.chart.options.plugins.tooltip.bodyColor = isDark ? '#94a3b8' : '#64748b';
       this.chart.options.plugins.tooltip.borderColor = isDark ? '#334155' : '#e2e8f0';
 
-      this.chart.update('active'); // 使用内置动画
+      this.chart.update('none');
+      this.resetZoom(range, displayMode);
       return;
     }
 
@@ -134,7 +155,7 @@ export class ChartManager {
             padding: 12,
             callbacks: {
               label: (context) => {
-                const unit = chartMode === 'price' ? ' p' : ' 人';
+                const unit = chartMode === 'price' ? this.t('unitPrice') : this.t('unitSellers');
                 return ` ${context.dataset.label.split(' (')[0]}: ${context.parsed.y}${unit}`;
               }
             }
@@ -143,15 +164,7 @@ export class ChartManager {
       }
     });
 
-    // 初始缩放
-    let initialMin;
-    if (mode === 'raw') {
-      initialMin = now.minus({ hours: 24 });
-    } else {
-      const rangeMap = { '1h': { hours: 24 }, '4h': { days: 7 }, '1d': { days: 30 } };
-      initialMin = now.minus(rangeMap[range] || { days: 30 });
-    }
-    this.chart.zoomScale('x', { min: initialMin.toISO(), max: now.toISO() });
+    this.resetZoom(range, displayMode);
   }
 
   resetZoom(range, displayMode) {
@@ -164,6 +177,6 @@ export class ChartManager {
       const rangeMap = { '1h': { hours: 24 }, '4h': { days: 7 }, '1d': { days: 30 } };
       initialMin = now.minus(rangeMap[range] || { days: 30 });
     }
-    this.chart.zoomScale('x', { min: initialMin.toISO(), max: now.toISO() });
+    this.chart.zoomScale('x', { min: initialMin.toJSDate(), max: now.toJSDate() }, 'easeOutQuart');
   }
 }

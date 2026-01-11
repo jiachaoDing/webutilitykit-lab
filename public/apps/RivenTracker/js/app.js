@@ -63,11 +63,7 @@ class App {
   initTheme() {
     const saved = localStorage.getItem('riven_tracker_theme');
     const isDark = saved ? saved === 'dark' : document.documentElement.classList.contains('dark');
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
+    document.documentElement.classList.toggle('dark', isDark);
     return isDark;
   }
 
@@ -76,7 +72,6 @@ class App {
     document.documentElement.classList.toggle('dark', this.state.isDark);
     localStorage.setItem('riven_tracker_theme', this.state.isDark ? 'dark' : 'light');
     
-    // 如果有图表，需要重新渲染以应用主题颜色
     if (this.state.lastTrendData) {
       this.chartManager.render(this.state.lastTrendData, this.state.chartMode, this.state.displayMode, this.state.isDark);
     }

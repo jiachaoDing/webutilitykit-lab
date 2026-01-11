@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* 启用类名切换模式的暗黑模式变体 */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --color-lab-bg: #0b1020;
   --color-lab-accent: #7c3aed;
@@ -8,10 +11,28 @@
 }
 
 @layer base {
+  :root {
+    color-scheme: light;
+  }
+  .dark {
+    color-scheme: dark;
+  }
+
   body {
-    @apply bg-lab-bg text-white/90 antialiased min-h-screen;
+    /* 默认背景为明亮色（针对子应用） */
+    @apply bg-slate-50 text-slate-900 antialiased min-h-screen transition-colors duration-300;
+  }
+
+  /* 暗黑模式下的通用背景（针对子应用） */
+  .dark body {
+    @apply bg-slate-950 text-slate-200;
+  }
+
+  /* 【关键】实验室大厅专用背景（强制深色风格，不受外部主题影响） */
+  body:has(main.lab-dashboard) {
     background: radial-gradient(1200px 600px at 20% 10%, rgba(124, 58, 237, 0.25), transparent 60%),
                 radial-gradient(900px 450px at 80% 0%, rgba(56, 189, 248, 0.18), transparent 55%),
-                #0b1020;
+                #0b1020 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
   }
 }
