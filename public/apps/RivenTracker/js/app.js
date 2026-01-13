@@ -236,12 +236,14 @@ class App {
   async showHotWeaponsModal() {
     UI.elements.hotWeaponsModal.classList.remove('hidden');
     document.body.style.overflow = 'hidden';
-    UI.elements.hotWeaponsModalContent.innerHTML = '<div class="col-span-full flex items-center justify-center py-12"><div class="loading-spinner scale-150"></div></div>';
+    
+    const loadingHtml = `<div class="col-span-full flex items-center justify-center py-12"><div class="loading-spinner scale-150"></div></div>`;
+    UI.elements.hotWeaponsModalContent.innerHTML = loadingHtml;
     
     try {
       const { data } = await fetchHotWeapons(50, 'price');
       UI.elements.hotWeaponsModalContent.innerHTML = data.map((w, index) => {
-        const displayName = w.name_zh || w.name_en;
+        const displayName = UI.lang === 'en' ? w.name_en : (w.name_zh || w.name_en);
         const rankClass = index === 0 ? 'from-amber-500 to-yellow-500' : index === 1 ? 'from-slate-400 to-slate-500' : index === 2 ? 'from-orange-600 to-amber-700' : 'from-slate-200 to-slate-300 dark:from-slate-700 dark:to-slate-800';
         const weaponData = JSON.stringify(w).replace(/'/g, "&apos;");
         return `
@@ -249,7 +251,7 @@ class App {
             <div class="flex-shrink-0 w-10 h-10 rounded-lg bg-gradient-to-br ${rankClass} flex items-center justify-center font-black text-sm text-white shadow-sm">${index + 1}</div>
             <div class="w-10 h-10 rounded-lg bg-slate-100 dark:bg-slate-800 p-1.5 flex-shrink-0"><img src="${UI.getThumbUrl(w.thumb)}" class="w-full h-full object-contain" /></div>
             <div class="flex-grow min-w-0"><div class="text-sm font-bold truncate">${displayName}</div><div class="text-[10px] text-slate-500 uppercase">${w.group}</div></div>
-            <div class="text-right"><div class="text-sm font-mono font-bold text-violet-500">${w.bottom_price || w.min_price} p</div><div class="text-[10px] text-slate-400">${w.active_count} 卖家</div></div>
+            <div class="text-right"><div class="text-sm font-mono font-bold text-violet-500">${w.bottom_price || w.min_price} p</div><div class="text-[10px] text-slate-400">${w.active_count} ${UI.t('sellers')}</div></div>
           </div>
         `;
       }).join('');
@@ -262,7 +264,8 @@ class App {
       });
     } catch (e) {
       console.error("[App] showHotWeaponsModal failed:", e);
-      UI.elements.hotWeaponsModalContent.innerHTML = '<div class="col-span-full text-center text-rose-400 py-12">加载失败，请稍后重试</div>';
+      const errorMsg = UI.lang === 'en' ? 'Load failed, please try again' : '加载失败，请稍后重试';
+      UI.elements.hotWeaponsModalContent.innerHTML = `<div class="col-span-full text-center text-rose-400 py-12">${errorMsg}</div>`;
     }
   }
 

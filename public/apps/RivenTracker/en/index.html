@@ -34,7 +34,7 @@
         </div>
         <nav class="flex items-center gap-2">
           <a href="../" class="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-[10px] font-bold text-slate-600 dark:text-slate-400" title="切换到中文">
-            中文
+            中
           </a>
           <button id="themeToggle" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-slate-600 dark:text-slate-400" title="Toggle Theme">
             <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
@@ -43,7 +43,7 @@
           <a href="/" class="group flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-slate-600 dark:text-slate-400">
             <svg xmlns="http://www.w3.org/2000/svg" class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"/></svg>
             <span class="hidden sm:inline">Back to Lobby</span>
-            <span class="sm:hidden">Back</span>
+            <span class="sm:hidden"></span>
           </a>
         </nav>
       </header>
@@ -132,7 +132,6 @@
                     <option value="4h" data-mode="aggregated">4h Interval</option>
                     <option value="1d" data-mode="aggregated">1d Interval</option>
                   </select>
-                  <p id="rangeHint" class="absolute -bottom-5 right-0 text-[9px] text-slate-400 font-medium whitespace-nowrap"></p>
                   <button id="resetZoomBtn" class="hidden bg-slate-50 dark:bg-slate-800 border-none rounded-lg px-2 py-1.5 text-[10px] font-bold focus:ring-2 focus:ring-violet-500 outline-none transition-all hover:bg-slate-100 dark:hover:bg-slate-700">
                     Reset Zoom
                   </button>
@@ -184,7 +183,7 @@
                 <table class="w-full text-left text-[10px]">
                   <thead class="bg-slate-50 dark:bg-slate-800/50 text-slate-500 font-bold border-b border-slate-200 dark:border-slate-800">
                     <tr>
-                      <th class="px-3 py-2">Sample Time</th>
+                      <th class="px-3 py-2">Time (UTC)</th>
                       <th class="px-3 py-2 text-right">Weighted</th>
                       <th class="px-3 py-2 text-right">Min (P1)</th>
                       <th class="px-3 py-2 text-right">P5</th>

@@ -87,6 +87,30 @@ rivenTrackerApp.get("/bottom-now", async (c) => {
 });
 
 /**
+ * 获取昨日底价均价接口 (专供插件识别使用)
+ * 浏览器缓存：1 小时 (昨日数据每天聚合一次)
+ */
+rivenTrackerApp.get("/yesterday-price", async (c) => {
+  const weapon = c.req.query("weapon");
+  const platform = c.req.query("platform") || "pc";
+  if (!weapon) return c.json({ error: "weapon is required" }, 400);
+
+  const trendService = new TrendService(
+    new TickRepo(c.env.DB), 
+    new WeaponRepo(c.env.DB),
+    undefined,
+    c.env.KV,
+    c.env.RIVEN_COORDINATOR,
+    c.executionCtx
+  );
+  
+  const cacheTTL = 3600;
+  c.header('Cache-Control', `public, max-age=${cacheTTL}, s-maxage=${cacheTTL}`);
+  
+  return c.json(await trendService.getYesterdayPrice(weapon, platform));
+});
+
+/**
  * 获取最新热门/高价武器
  * 缓存策略：20 分钟（匹配采样周期）
  */

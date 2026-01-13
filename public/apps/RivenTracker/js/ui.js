@@ -1,6 +1,7 @@
 import { getThumbUrl } from './utils.js';
 
 export const UI = {
+  // 确保能准确获取语言，增加回退逻辑
   lang: document.documentElement.lang || 'zh-CN',
 
   elements: {
@@ -39,7 +40,14 @@ export const UI = {
 
   i18n: {
     en: {
-      // ... 
+      noData: 'No sampling data available',
+      noMatch: 'No matching weapons found',
+      insufficient: 'Under 10 sellers',
+      never: 'Never',
+      sustained: 'Steady',
+      sellers: 'sellers',
+      weighted: 'Weighted',
+      disposition: 'Disp',
       rangeHints: {
         '24h': 'Displays last 24h raw data',
         '1h': 'Displays last 24h aggregated data',
@@ -48,7 +56,14 @@ export const UI = {
       }
     },
     'zh-CN': {
-      // ...
+      noData: '暂无采样数据',
+      noMatch: '未找到匹配武器',
+      insufficient: '不足10人',
+      never: '从未',
+      sustained: '持平',
+      sellers: '卖家',
+      weighted: '加权',
+      disposition: '倾向',
       rangeHints: {
         '24h': '显示最近 24 小时原始采样',
         '1h': '显示最近 24 小时聚合数据',
@@ -58,12 +73,7 @@ export const UI = {
     }
   },
 
-  updateRangeHint(range) {
-    if (!this.elements.rangeHint) return;
-    const hint = this.i18n[this.lang].rangeHints[range] || '';
-    this.elements.rangeHint.textContent = hint;
-  },
-
+  // 统一翻译方法
   t(key) {
     const dict = this.i18n[this.lang] || this.i18n['zh-CN'];
     return dict[key] || key;
@@ -171,8 +181,14 @@ export const UI = {
 
   updateWeaponHeader(weapon) {
     this.elements.currentWeaponName.textContent = this.lang === 'en' ? weapon.name_en : (weapon.name_zh || weapon.name_en);
-    const typeLabel = this.i18n[this.lang].types[weapon.rivenType] || weapon.rivenType || 'Unknown';
-    const dispLabel = this.t('disposition');
+    
+    // 直接使用原始的 rivenType，仅处理首字母大写
+    const rawType = weapon.rivenType || 'Unknown';
+    const typeLabel = rawType.charAt(0).toUpperCase() + rawType.slice(1).toLowerCase();
+    
+    const dict = this.i18n[this.lang] || this.i18n['zh-CN'];
+    const dispLabel = dict.disposition || 'Disp';
+
     this.elements.weaponSubtext.textContent = `${typeLabel} | ${dispLabel}: ${weapon.disposition}`;
     this.elements.weaponIcon.innerHTML = `<img src="${getThumbUrl(weapon.thumb)}" class="w-full h-full object-contain p-1" />`;
     this.elements.weaponIcon.classList.remove('bg-slate-100', 'dark:bg-slate-800');
@@ -207,6 +223,13 @@ export const UI = {
 
     const latestSample = trendData.data[trendData.data.length - 1];
     this.elements.activeOrders.textContent = latestSample.active_count || latestSample.sample_count || '--';
+  },
+
+  updateRangeHint(range) {
+    if (!this.elements.rangeHint) return;
+    const dict = this.i18n[this.lang] || this.i18n['zh-CN'];
+    const hint = (dict.rangeHints && dict.rangeHints[range]) || '';
+    this.elements.rangeHint.textContent = hint;
   },
 
   renderTable(data) {

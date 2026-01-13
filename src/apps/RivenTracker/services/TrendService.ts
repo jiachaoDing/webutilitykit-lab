@@ -329,5 +329,27 @@ export class TrendService {
     return result;
   }
 
+  /**
+   * 获取昨日底价均价 (供浏览器插件等外部调用)
+   */
+  async getYesterdayPrice(weaponSlug: string, platform: string = 'pc') {
+    // 获取 UTC 昨天的日期字符串 YYYY-MM-DD
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    
+    // 复用 getDailyTrend，但只取昨天的数据
+    const results = await this.tickRepo.getDailyTrend(weaponSlug, platform, yesterday);
+    // getDailyTrend 返回的是 ts >= yesterday，所以我们找正好是昨天的
+    const yesterdayData = results.find(r => r.ts.startsWith(yesterday));
+
+    return {
+      weapon: weaponSlug,
+      platform,
+      date: yesterday,
+      avg_bottom_price: yesterdayData ? yesterdayData.bottom_price : null,
+      active_count: yesterdayData ? yesterdayData.active_count : 0,
+      success: !!yesterdayData
+    };
+  }
+
 }
 

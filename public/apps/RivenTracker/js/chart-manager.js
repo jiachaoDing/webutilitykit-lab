@@ -44,12 +44,12 @@ export class ChartManager {
           label: this.t('weightedBottomPrice'),
           data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.bottom_price })),
           borderColor: '#6366f1',
-          borderWidth: 3,
+          borderWidth: 2,
           backgroundColor: 'rgba(99, 102, 241, 0.05)',
           fill: true,
           tension: 0.4,
-          pointRadius: mode === 'aggregated' ? 4 : 3,
-          pointHoverRadius: 6,
+          pointRadius: mode === 'aggregated' ? 2 : 1.5,
+          pointHoverRadius: 4,
           pointHoverBackgroundColor: '#6366f1',
           pointHoverBorderColor: '#fff',
           pointHoverBorderWidth: 2
@@ -71,12 +71,12 @@ export class ChartManager {
           label: this.t('activeSellers'),
           data: data.map(d => ({ x: luxon.DateTime.fromISO(d.ts).toJSDate(), y: d.active_count ?? d.sample_count ?? 0 })),
           borderColor: '#10b981',
-          borderWidth: 3,
+          borderWidth: 2,
           backgroundColor: 'rgba(16, 185, 129, 0.05)',
           fill: true,
           tension: 0.4,
-          pointRadius: mode === 'aggregated' ? 4 : 3,
-          pointHoverRadius: 6,
+          pointRadius: mode === 'aggregated' ? 2 : 1.5,
+          pointHoverRadius: 4,
           pointHoverBackgroundColor: '#10b981',
           pointHoverBorderColor: '#fff',
           pointHoverBorderWidth: 2
@@ -89,7 +89,13 @@ export class ChartManager {
     const rangeMap = { '24h': { hours: 24 }, '1h': { hours: 24 }, '4h': { days: 7 }, '1d': { days: 30 } };
     const currentDuration = rangeMap[range] || { days: 30 };
     
-    const firstPoint = data.length > 0 ? luxon.DateTime.fromISO(data[0].ts).toMillis() : now.minus(currentDuration).toMillis();
+    // 给左侧增加一小段缓冲时间（约跨度的 5%），防止点被截断
+    const bufferMillis = luxon.Duration.fromObject(currentDuration).as('milliseconds') * 0.05;
+    
+    const firstPoint = data.length > 0 
+      ? luxon.DateTime.fromISO(data[0].ts).minus(bufferMillis).toMillis() 
+      : now.minus(currentDuration).minus(bufferMillis).toMillis();
+      
     // 允许向右滑动一段距离（留白）
     const limitMax = now.plus(currentDuration).toMillis();
 
@@ -223,9 +229,13 @@ export class ChartManager {
     }
     
     const initialMin = now.minus(duration);
+    // 为左侧视图增加一小段偏移，防止第一个点被截断
+    const bufferMillis = luxon.Duration.fromObject(duration).as('milliseconds') * 0.05;
+    const paddedMin = initialMin.minus(bufferMillis);
+    
     // 将 max 设置为 now + duration，使 now 处于图表正中间
     const initialMax = now.plus(duration);
     
-    this.chart.zoomScale('x', { min: initialMin.toJSDate(), max: initialMax.toJSDate() }, 'easeOutQuart');
+    this.chart.zoomScale('x', { min: paddedMin.toJSDate(), max: initialMax.toJSDate() }, 'easeOutQuart');
   }
 }
