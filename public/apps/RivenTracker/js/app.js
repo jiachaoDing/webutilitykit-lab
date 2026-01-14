@@ -22,7 +22,10 @@ class App {
     this.updateDisplayModeUI();
     this.renderRecent();
     UI.updateRangeHint(UI.elements.rangeSelect.value);
-    
+
+    // 解析 URL 参数中的 weapon 参数
+    this.checkUrlParams();
+
     // 异步加载初始化数据
     this.loadHealth();
     this.loadHotWeapons();
@@ -273,6 +276,39 @@ class App {
     if (e && e.target !== e.currentTarget) return;
     UI.elements.hotWeaponsModal.classList.add('hidden');
     document.body.style.overflow = '';
+  }
+
+  // 检查 URL 参数，如果有 weapon 参数则自动选择对应武器
+  async checkUrlParams() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const weaponSlug = urlParams.get('weapon');
+
+    if (weaponSlug) {
+      // 等待武器数据加载完成后尝试选择武器
+      await this.selectWeaponBySlug(weaponSlug);
+    }
+  }
+
+  // 根据 weapon slug 选择武器
+  async selectWeaponBySlug(slug) {
+    // 如果武器缓存还没有加载，等待加载完成
+    if (!this.state.weaponsCache) {
+      try {
+        const { data } = await fetchWeapons('', 1000);
+        this.state.weaponsCache = data;
+      } catch (e) {
+        console.error('Failed to load weapons cache:', e);
+        return;
+      }
+    }
+
+    // 在缓存中查找对应的武器
+    const weapon = this.state.weaponsCache.find(w => w.slug === slug);
+    if (weapon) {
+      this.selectWeapon(weapon);
+    } else {
+      console.warn(`Weapon with slug "${slug}" not found`);
+    }
   }
 }
 
