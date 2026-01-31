@@ -34,6 +34,8 @@ pattern = "lab.webutilitykit.com"
 zone_name = "webutilitykit.com"
 custom_domain = true
 
+# 注意：Riven Tracker 武器详情页路由已在 src/index.ts 中处理
+
 [[kv_namespaces]]
 binding = "KV"
 id = "4044f8ce15584d4cbdb6c3117eb458c3"

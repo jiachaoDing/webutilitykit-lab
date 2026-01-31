@@ -336,6 +336,11 @@ export class RivenCoordinatorDO implements DurableObject {
     await Promise.all([
       this.env.KV.put("riven:list:hot", JSON.stringify(this.listHot)),
       this.env.KV.put("riven:list:cold", JSON.stringify(this.listCold)),
+      // 新增：全量武器字典缓存，优化 search 接口性能
+      this.env.KV.put("riven:dict:full", JSON.stringify({
+        data: allWeapons,
+        updated_at: new Date().toISOString()
+      }), { expirationTtl: 86400 * 7 }) // 缓存 7 天
     ]);
   }
 }

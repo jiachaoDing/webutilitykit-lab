@@ -281,10 +281,40 @@ export class TrendService {
 
   /**
    * 搜索武器
+   * 优先从 KV 读取全量字典并在内存中过滤，极大降低 D1 消耗
    */
   async searchWeapons(q: string, limit: number = 20) {
-    const results = await this.weaponRepo.search(q, limit);
-    return { data: results };
+    const query = q.trim().toLowerCase();
+    
+    // 1. 尝试从 KV 获取全量字典
+    if (this.kv) {
+      const cached = await this.kv.get("riven:dict:full");
+      if (cached) {
+        try {
+          const { data } = JSON.parse(cached) as { data: any[] };
+          
+          // 如果没有搜索词，直接返回前 limit 个
+          if (!query) {
+            return { data: data.slice(0, limit), source: 'kv_full' };
+          }
+          
+          // 在内存中过滤
+          const filtered = data.filter(w => 
+            w.slug.toLowerCase().includes(query) || 
+            w.name_en.toLowerCase().includes(query) || 
+            (w.name_zh && w.name_zh.toLowerCase().includes(query))
+          ).slice(0, limit);
+          
+          return { data: filtered, source: 'kv_filtered' };
+        } catch (e) {
+          console.error("[TrendService] Parse full dict failed:", e);
+        }
+      }
+    }
+
+    // 2. 兜底：KV 缺失或解析失败，查 D1
+    const results = await this.weaponRepo.search(query, limit);
+    return { data: results, source: 'd1' };
   }
 
   /**

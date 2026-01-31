@@ -250,5 +250,27 @@ export const UI = {
         </td>
       </tr>
     `).join('');
+  },
+
+  // 重置武器显示（返回首页状态）
+  resetWeaponDisplay() {
+    this.elements.currentWeaponName.textContent = document.documentElement.lang === 'en' ? 'Select a weapon' : '选择武器';
+    this.elements.weaponSubtext.textContent = document.documentElement.lang === 'en' 
+      ? 'Search weapon to view riven mod price history and market data' 
+      : '搜索或选择武器查看价格趋势';
+    this.elements.weaponActions.classList.add('hidden');
+    this.elements.copyNameBtn.classList.add('hidden');
+    this.elements.chartEmpty.classList.remove('hidden');
+    this.elements.dataTableContainer.classList.add('hidden');
+    
+    // 重置统计数据
+    this.elements.avgPrice.textContent = '--';
+    this.elements.priceChange.textContent = '--';
+    this.elements.activeOrders.textContent = '--';
+    
+    // 清除图表
+    const canvas = document.getElementById('trendChart');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
   }
 };

@@ -3,10 +3,93 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Riven Tracker - WebUtilityKit Lab</title>
+    
+    <!-- Primary Meta Tags -->
+    <title>Warframe Riven Price Tracker - Check Riven Mod Market Prices & Trends</title>
+    <meta name="description" content="Track Warframe Riven Mod prices in real-time. Check bottom prices, price history charts, and market trends for all weapons. Free Riven price checker updated every 20 minutes." />
+    <meta name="keywords" content="warframe riven price, riven mod prices, warframe riven market, riven price tracker, warframe riven checker, riven bottom price, warframe market riven, riven price history" />
+    <meta name="author" content="WebUtilityKit Lab" />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://webutilitykit.com/apps/RivenTracker/en/" />
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://webutilitykit.com/apps/RivenTracker/en/" />
+    <meta property="og:title" content="Warframe Riven Price Tracker - Real-Time Market Prices" />
+    <meta property="og:description" content="Check real-time Warframe Riven Mod prices. Track bottom prices, view price history charts, and analyze market trends for all weapons." />
+    <meta property="og:image" content="https://webutilitykit.com/apps/RivenTracker/images/og-image.png" />
+    <meta property="og:site_name" content="WebUtilityKit Lab" />
+    <meta property="og:locale" content="en_US" />
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image" />
+    <meta property="twitter:url" content="https://webutilitykit.com/apps/RivenTracker/en/" />
+    <meta property="twitter:title" content="Warframe Riven Price Tracker - Real-Time Market Prices" />
+    <meta property="twitter:description" content="Check real-time Warframe Riven Mod prices. Track bottom prices, view price history charts, and analyze market trends." />
+    <meta property="twitter:image" content="https://webutilitykit.com/apps/RivenTracker/images/og-image.png" />
+    
+    <!-- Alternate Languages -->
+    <link rel="alternate" hreflang="en" href="https://webutilitykit.com/apps/RivenTracker/en/" />
+    <link rel="alternate" hreflang="zh" href="https://webutilitykit.com/apps/RivenTracker/" />
+    <link rel="alternate" hreflang="x-default" href="https://webutilitykit.com/apps/RivenTracker/en/" />
+    
+    <!-- Styles -->
     <link rel="stylesheet" href="/assets/tailwind.css" />
-    <!-- External Styles -->
-    <link rel="stylesheet" href="../css/styles.css" />
+    <link rel="stylesheet" href="/apps/RivenTracker/css/styles.css" />
+    
+    <!-- Schema.org Structured Data -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebApplication",
+      "name": "Warframe Riven Price Tracker",
+      "description": "Track Warframe Riven Mod prices in real-time. Check bottom prices, price history charts, and market trends for all weapons.",
+      "url": "https://webutilitykit.com/apps/RivenTracker/en/",
+      "applicationCategory": "GameApplication",
+      "operatingSystem": "Any",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "author": {
+        "@type": "Organization",
+        "name": "WebUtilityKit Lab",
+        "url": "https://webutilitykit.com"
+      },
+      "about": {
+        "@type": "VideoGame",
+        "name": "Warframe",
+        "applicationCategory": "Game"
+      }
+    }
+    </script>
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        {
+          "@type": "ListItem",
+          "position": 1,
+          "name": "Home",
+          "item": "https://webutilitykit.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 2,
+          "name": "Apps",
+          "item": "https://webutilitykit.com/"
+        },
+        {
+          "@type": "ListItem",
+          "position": 3,
+          "name": "Riven Tracker",
+          "item": "https://webutilitykit.com/apps/RivenTracker/en/"
+        }
+      ]
+    }
+    </script>
     
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js" defer></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/hammer.js/2.0.8/hammer.min.js" defer></script>
@@ -24,18 +107,18 @@
           </a>
           <div>
             <div class="flex items-center gap-2">
-              <h1 class="text-lg font-bold text-slate-900 dark:text-white">Riven Tracker</h1>
+              <h1 class="text-lg font-bold text-slate-900 dark:text-white">Warframe Riven Tracker</h1>
               <span class="px-1.5 py-0.5 rounded-full text-[9px] uppercase tracking-wider font-bold border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
                 Beta
               </span>
             </div>
-            <p class="hidden sm:block text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Warframe Riven Bottom Price Tracker</p>
+            <p class="hidden sm:block text-slate-500 dark:text-slate-400 text-[11px] mt-0.5">Real-time Riven Mod Price Checker & Market Trends</p>
           </div>
         </div>
         <nav class="flex items-center gap-2">
-          <a href="../" class="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-[10px] font-bold text-slate-600 dark:text-slate-400" title="切换到中文">
+          <button onclick="switchLanguage('zh')" class="px-2 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-[10px] font-bold text-slate-600 dark:text-slate-400" title="切换到中文">
             中
-          </a>
+          </button>
           <button id="themeToggle" class="p-1.5 rounded-lg border border-slate-200 dark:border-slate-800 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95 text-slate-600 dark:text-slate-400" title="Toggle Theme">
             <svg id="sunIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
             <svg id="moonIcon" xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
@@ -55,11 +138,11 @@
           <!-- Search Card -->
           <div class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm focus-within:ring-2 focus-within:ring-violet-500/20 transition-all">
             <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2.5 flex justify-between items-center">
-              Select Weapon
+              Search Riven by Weapon
               <kbd class="hidden md:inline-flex items-center px-1 py-0.5 rounded border border-slate-200 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 text-[9px] font-mono">ESC</kbd>
             </label>
             <div class="relative">
-              <input type="text" id="searchInput" autocomplete="off" placeholder="Search weapon name..." class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none transition-all text-sm" />
+              <input type="text" id="searchInput" autocomplete="off" placeholder="Enter weapon name (e.g., Kuva Bramma, Rubico Prime)..." aria-label="Search for weapon riven prices" class="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:ring-2 focus:ring-violet-500 outline-none transition-all text-sm" />
               <div id="searchLoader" class="hidden absolute right-3 top-2">
                 <div class="loading-spinner scale-75"></div>
               </div>
@@ -96,7 +179,7 @@
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="14" height="14" x="8" y="8" rx="2" ry="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>
                   </button>
                 </div>
-                <p id="weaponSubtext" class="text-slate-500 font-medium text-xs truncate">Search or select a weapon from the left</p>
+                <p id="weaponSubtext" class="text-slate-500 font-medium text-xs truncate">Search weapon to view riven mod price history and market data</p>
               </div>
             </div>
             
@@ -114,7 +197,7 @@
             <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
               <div class="flex items-center gap-2">
                 <div class="w-1 h-5 bg-violet-500 rounded-full"></div>
-                <h3 class="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">Bottom Price Trend</h3>
+                <h2 class="font-bold text-slate-900 dark:text-white uppercase tracking-wider text-xs">Riven Mod Price Trend</h2>
               </div>
               <div class="flex items-center gap-2 w-full sm:w-auto justify-between sm:justify-end">
                 <div class="flex items-center bg-slate-100 dark:bg-slate-800 p-0.5 rounded-lg">
@@ -168,8 +251,8 @@
                 <div id="activeOrders" class="text-base font-mono font-bold text-slate-900 dark:text-white">--</div>
               </div>
               <div class="space-y-1">
-                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Model</span>
-                <div class="text-[9px] font-medium text-slate-500 leading-tight">Weighted average of top 5 lowest In-Game prices</div>
+                <span class="text-[9px] text-slate-400 uppercase font-bold tracking-widest">Pricing Model</span>
+                <div class="text-[9px] font-medium text-slate-500 leading-tight">Weighted average of top 5 lowest In-Game riven mod prices</div>
               </div>
             </div>
 
@@ -205,7 +288,7 @@
           <div id="hotContainer" class="p-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm">
             <div class="flex items-center justify-between mb-3">
               <div class="flex items-center gap-2 cursor-pointer group" onclick="showHotWeaponsModal()">
-                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-violet-500 transition-colors">Hot Weapons (Top Value)</h3>
+                <h3 class="text-[10px] font-bold text-slate-400 uppercase tracking-widest group-hover:text-violet-500 transition-colors">Hot Riven Market (Top Value)</h3>
                 <span class="text-[8px] text-slate-400 px-1 py-0.5 rounded bg-slate-100 dark:bg-slate-800">In-Game</span>
                 <svg class="w-3 h-3 text-slate-400 group-hover:text-violet-500 transition-colors opacity-0 group-hover:opacity-100" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
               </div>
@@ -233,8 +316,8 @@
                 <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
               </div>
               <div>
-                <h2 class="text-base font-bold text-slate-900 dark:text-white">Hot Riven Ranking</h2>
-                <p class="text-[10px] text-slate-500">Sorted by latest bottom price · Top 50</p>
+                <h2 class="text-base font-bold text-slate-900 dark:text-white">Warframe Riven Market Ranking</h2>
+                <p class="text-[10px] text-slate-500">Sorted by latest bottom price · Top 50 Most Valuable Riven Mods</p>
               </div>
             </div>
             <button onclick="closeHotWeaponsModal()" class="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-all active:scale-95">
@@ -295,12 +378,12 @@
                 <div class="flex items-center gap-1.5">
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-violet-500/10 text-violet-600 dark:text-violet-400 border border-violet-500/20">Hot</span>
                   <span class="text-slate-600 dark:text-slate-400">~20 min / round</span>
-                  <span class="text-slate-400">(Top 50)</span>
+                  <span class="text-slate-400">(Top 50 weapons)</span>
                 </div>
                 <div class="flex items-center gap-1.5">
                   <span class="inline-flex items-center px-1.5 py-0.5 rounded-full text-[8px] font-bold bg-slate-500/10 text-slate-600 dark:text-slate-400 border border-slate-500/20">Cold</span>
                   <span class="text-slate-600 dark:text-slate-400">~1.2 hours / round</span>
-                  <span class="text-slate-400">(Others)</span>
+                  <span class="text-slate-400">(Other weapons)</span>
                 </div>
               </div>
             </div>
@@ -310,14 +393,39 @@
           <div class="pt-3 border-t border-slate-200 dark:border-slate-800">
             <div class="flex items-center gap-2 text-[10px] text-slate-500">
               <svg class="w-3.5 h-3.5 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-              <span class="font-medium text-slate-600 dark:text-slate-400">Weighted Bottom Price: Calculated using the top 5 lowest In-Game prices to reflect the real market value.</span>
+              <span class="font-medium text-slate-600 dark:text-slate-400">Per-Weapon Price: For each weapon, we fetch the 5 lowest In-Game sell orders and use the lowest price as the current market value.</span>
             </div>
           </div>
         </div>
       </div>
     </main>
 
-    <script type="module" src="../js/app.js"></script>
+    <!-- SEO Content Section -->
+    <section class="max-w-7xl mx-auto px-4 py-8 border-t border-slate-200 dark:border-slate-800" aria-labelledby="about-heading">
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6 text-[11px] text-slate-500 dark:text-slate-400">
+        <div>
+          <h2 id="about-heading" class="font-bold text-slate-900 dark:text-white mb-2 text-xs uppercase tracking-wider">About Warframe Riven Tracker</h2>
+          <p class="leading-relaxed">Track real-time prices for <strong class="text-slate-700 dark:text-slate-300">Warframe Riven Mods</strong>. We use a <strong class="text-slate-700 dark:text-slate-300">layered sampling strategy</strong> (Hot weapons every ~20 min, Cold weapons every ~1.2 hours) and check the 5 lowest In-Game orders for each weapon to determine market prices.</p>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 dark:text-white mb-2 text-xs uppercase tracking-wider">How Riven Pricing Works</h3>
+          <p class="leading-relaxed"><strong class="text-slate-700 dark:text-slate-300">Two-level strategy:</strong> (1) Weapon-level: Hot weapons (Top 50) are checked more frequently than Cold weapons. (2) Price-level: For each weapon, we fetch the 5 lowest In-Game sell orders and use the lowest as the current market price.</p>
+        </div>
+        <div>
+          <h3 class="font-bold text-slate-900 dark:text-white mb-2 text-xs uppercase tracking-wider">Supported Weapons</h3>
+          <p class="leading-relaxed">Track prices for all Warframe weapons including <strong class="text-slate-700 dark:text-slate-300">Kuva weapons</strong>, <strong class="text-slate-700 dark:text-slate-300">Prime weapons</strong>, <strong class="text-slate-700 dark:text-slate-300">Tenet weapons</strong>, and standard weapons. Check riven prices before buying or selling on Warframe Market.</p>
+        </div>
+      </div>
+      <div class="mt-6 pt-4 border-t border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-4 text-[10px] text-slate-400">
+        <p>&copy; 2025 WebUtilityKit Lab. Not affiliated with Digital Extremes. Warframe is a registered trademark.</p>
+        <div class="flex items-center gap-4">
+          <a href="/" class="hover:text-violet-500 transition-colors">More Tools</a>
+          <button onclick="switchLanguage('zh')" class="hover:text-violet-500 transition-colors">中文版本</button>
+        </div>
+      </div>
+    </section>
+
+    <script type="module" src="/apps/RivenTracker/js/app.js"></script>
   </body>
 </html>
 

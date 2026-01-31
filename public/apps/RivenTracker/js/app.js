@@ -65,6 +65,39 @@ class App {
     window.showHotWeaponsModal = () => this.showHotWeaponsModal();
     window.closeHotWeaponsModal = (e) => this.closeHotWeaponsModal(e);
     UI.elements.copyNameBtn.onclick = () => this.copyWeaponName();
+    
+    // 语言切换函数
+    window.switchLanguage = (lang) => {
+      const pathMatch = window.location.pathname.match(/\/weapon\/([^\/]+)\/?$/);
+      if (pathMatch && pathMatch[1]) {
+        // 在武器详情页，切换时保留武器 slug
+        const weaponSlug = pathMatch[1];
+        if (lang === 'en') {
+          window.location.href = `/apps/RivenTracker/en/weapon/${weaponSlug}/`;
+        } else {
+          window.location.href = `/apps/RivenTracker/weapon/${weaponSlug}/`;
+        }
+      } else {
+        // 在首页，直接切换
+        if (lang === 'en') {
+          window.location.href = '/apps/RivenTracker/en/';
+        } else {
+          window.location.href = '/apps/RivenTracker/';
+        }
+      }
+    };
+    
+    // 监听浏览器前进/后退按钮
+    window.addEventListener('popstate', (e) => {
+      const pathMatch = window.location.pathname.match(/\/weapon\/([^\/]+)\/?$/);
+      if (pathMatch && pathMatch[1]) {
+        this.selectWeaponBySlug(pathMatch[1]);
+      } else {
+        // 返回首页，清空当前武器
+        this.state.currentWeapon = null;
+        UI.resetWeaponDisplay();
+      }
+    });
   }
 
   initTheme() {
@@ -146,10 +179,53 @@ class App {
     UI.elements.searchInput.value = '';
     UI.updateWeaponHeader(weapon);
     
+    // 更新 URL 为路径格式（SEO友好）
+    this.updateUrlAndMeta(weapon);
+    
     this.saveRecent(weapon);
     this.renderRecent();
     UI.renderHotWeapons(this.state.hotWeaponsData, weapon, (w) => this.selectWeapon(w));
     this.loadTrend();
+  }
+
+  // 更新 URL 和页面 Meta 信息（用于SEO）
+  updateUrlAndMeta(weapon) {
+    // 根据当前语言选择路径前缀
+    const isEnglish = document.documentElement.lang === 'en';
+    const basePath = isEnglish ? '/apps/RivenTracker/en' : '/apps/RivenTracker';
+    const newPath = `${basePath}/weapon/${weapon.slug}/`;
+    
+    // 使用 history.pushState 更新 URL（不刷新页面）
+    if (window.location.pathname !== newPath) {
+      window.history.pushState({ weapon: weapon.slug }, '', newPath);
+    }
+    
+    // 更新页面标题
+    const weaponName = weapon.name || weapon.slug.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    
+    if (isEnglish) {
+      document.title = `${weaponName} Riven Price - Warframe Riven Tracker | WebUtilityKit`;
+      
+      // 更新 meta description
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.content = `Check ${weaponName} riven mod price history and current market value. Track bottom prices and market trends for ${weaponName} rivens in Warframe.`;
+      }
+    } else {
+      document.title = `${weaponName}紫卡价格 - Warframe紫卡查询 | WebUtilityKit`;
+      
+      // 更新 meta description
+      const metaDesc = document.querySelector('meta[name="description"]');
+      if (metaDesc) {
+        metaDesc.content = `查询${weaponName}紫卡价格历史和市场走势。追踪${weaponName}紫卡底价变化，获取Warframe Market实时数据。`;
+      }
+    }
+    
+    // 更新 canonical link
+    const canonical = document.querySelector('link[rel="canonical"]');
+    if (canonical) {
+      canonical.href = `https://lab.webutilitykit.com${newPath}`;
+    }
   }
 
   async loadTrend() {
@@ -278,10 +354,19 @@ class App {
     document.body.style.overflow = '';
   }
 
-  // 检查 URL 参数，如果有 weapon 参数则自动选择对应武器
+  // 检查 URL 参数，支持 ?weapon=xxx 和 /weapon/xxx/ 两种格式
   async checkUrlParams() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const weaponSlug = urlParams.get('weapon');
+    // 优先检查路径式 URL: /weapon/xxx/
+    const pathMatch = window.location.pathname.match(/\/weapon\/([^\/]+)\/?$/);
+    let weaponSlug = null;
+    
+    if (pathMatch) {
+      weaponSlug = pathMatch[1];
+    } else {
+      // 回退到查询参数: ?weapon=xxx
+      const urlParams = new URLSearchParams(window.location.search);
+      weaponSlug = urlParams.get('weapon');
+    }
 
     if (weaponSlug) {
       // 等待武器数据加载完成后尝试选择武器
