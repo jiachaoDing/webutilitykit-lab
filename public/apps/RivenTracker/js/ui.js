@@ -195,8 +195,8 @@ export const UI = {
     this.elements.weaponIcon.classList.add('bg-white', 'dark:bg-slate-900');
     this.elements.copyNameBtn.classList.remove('hidden');
     this.elements.weaponActions.classList.remove('hidden');
-    const wfmMarketLang = this.lang === 'en' ? 'en' : 'zh-hans';
-    this.elements.wfmLink.href = `https://warframe.market/${wfmMarketLang}/auctions/search?type=riven&sort_by=price_asc&weapon_url_name=${weapon.slug}`;
+    const wfmMarketLang = this.lang === 'en' ? '' : '/zh-hans';
+    this.elements.wfmLink.href = `https://warframe.market${wfmMarketLang}/auctions/search?type=riven&sort_by=price_asc&weapon_url_name=${weapon.slug}`;
   },
 
   updateStats(trendData) {

@@ -335,10 +335,17 @@ export class TrendService {
   async getYesterdayPrice(weaponSlug: string, platform: string = 'pc') {
     // 获取 UTC 昨天的日期字符串 YYYY-MM-DD
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const startTime = `${yesterday}T00:00:00Z`;
     
-    // 复用 getDailyTrend，但只取昨天的数据
-    const results = await this.tickRepo.getDailyTrend(weaponSlug, platform, yesterday);
-    // getDailyTrend 返回的是 ts >= yesterday，所以我们找正好是昨天的
+    // 1. 优先尝试从天级预聚合表获取
+    let results = await this.tickRepo.getDailyTrend(weaponSlug, platform, yesterday);
+    
+    // 2. 如果天级表没数据（聚合任务尚未运行），降级走 D1 实时聚合
+    if (results.length === 0) {
+      results = await this.tickRepo.getAggregatedTrend(weaponSlug, platform, startTime, 'day');
+    }
+    
+    // 查找正好是昨天的那一条
     const yesterdayData = results.find(r => r.ts.startsWith(yesterday));
 
     return {

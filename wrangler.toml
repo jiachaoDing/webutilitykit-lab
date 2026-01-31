@@ -26,8 +26,12 @@ database_id = "d2f50fd6-5410-4913-b7af-19a767e9ce25"
 [triggers]
 crons = ["* * * * *", "0 3 * * *"]
 
+[placement]
+mode = "smart"
+
 [[routes]]
 pattern = "lab.webutilitykit.com"
+zone_name = "webutilitykit.com"
 custom_domain = true
 
 [[kv_namespaces]]
